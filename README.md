@@ -2,11 +2,38 @@
 
 EctoMorph morphs your Ecto capabilities into the s t r a t o s p h e r e !
 
-<!-- Allowing validations on embeds -->
+Usually you have to do something like this:
+
+```elixir
+defmodule Embed do
+  use Ecto.Schema
+
+  embedded_schema do
+    field(:bar, :string)
+  end
+end
+
+defmodule Test do
+  use Ecto.Schema
+
+  embedded_schema do
+    field(:thing, :string)
+    embeds_one(:embed, Embed)
+  end
+
+Ecto.Changeset.cast(%Test{}, %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, [:thing])
+|> Ecto.Changeset.cast_embed(:embed)
+```
+
+Now we can do this:
+
+```elixir
+EctoMorph.to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test)
+```
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
+[available in Hex](https://hex.pm/docs/publish), the package can be installed
 by adding `ecto_morph` to your list of dependencies in `mix.exs`:
 
 ```elixir
