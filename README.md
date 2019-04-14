@@ -31,6 +31,15 @@ Now we can do this:
 EctoMorph.to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test)
 ```
 
+Or something like this:
+
+```elixir
+with {:ok, %{status: 200, body: body}} <- HTTPoison.get("mygreatapi.co.uk") do
+  Jason.decode!(body)
+  |> EctoMorph.to_struct(User)
+end
+```
+
 ## Installation
 
 [available in Hex](https://hex.pm/docs/publish), the package can be installed
