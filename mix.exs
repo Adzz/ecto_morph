@@ -3,10 +3,16 @@ defmodule EctoMorph.MixProject do
 
   def project do
     [
+      name: "EctoMorph",
       app: :ecto_morph,
+      licenses: "",
+      description: description(),
+      version: "0.1.1",
       version: "0.1.0",
+      package: package(),
       elixir: "~> 1.8",
       start_permanent: Mix.env() == :prod,
+      source_url: "https://github.com/Adzz/Zip",
       deps: deps()
     ]
   end
@@ -19,7 +25,19 @@ defmodule EctoMorph.MixProject do
 
   defp deps do
     [
-      {:ecto, ">= 3.0.3"}
+      {:ecto, ">= 3.0.3"},
+      {:ex_doc, "~> 0.19", only: :dev, runtime: false}
+    ]
+  end
+
+  defp description() do
+    "A utility library for Ecto"
+  end
+
+  defp package() do
+    [
+      licenses: ["Apache 2.0"],
+      links: %{"GitHub" => "https://github.com/Adzz/ecto_morph"}
     ]
   end
 end
