@@ -5,6 +5,7 @@ defmodule EctoMorph do
   @typep ecto_struct :: Ecto.Schema.t()
   @typep ecto_schema_module :: atom()
   @typep map_with_string_keys :: %{required(String.t()) => any()}
+
   @doc """
   Takes some data and tries to convert it to a struct in the shape of the given schema. Casts values
   to the types defined by the schema dynamically using ecto changesets.
@@ -60,9 +61,14 @@ defmodule EctoMorph do
           {:ok, ecto_struct} | {:error, Ecto.Changeset.t()}
   def to_struct(data, schema) do
     generate_changeset(data, schema)
-    |> make_struct()
+    |> into_struct()
   end
 
+  @doc """
+  Casts the given data into a changeset according to the types defined by the given
+  schema. It ignores any fields in data that are not defined in the schema, and
+  recursively casts any embedded fields to a changeset also.
+  """
   def generate_changeset(data, schema) do
     with [] <- embedded_schema_fields(schema) do
       schema
@@ -87,15 +93,16 @@ defmodule EctoMorph do
     end)
   end
 
-  defp make_struct(changeset = %{errors: []}) do
+  @doc "Take a changeset and returns a struct if there are no errors on the changeset"
+  def into_struct(changeset = %{errors: []}) do
     {:ok, Ecto.Changeset.apply_changes(changeset)}
   end
 
-  defp make_struct(changeset) do
+  def into_struct(changeset) do
     {:error, changeset}
   end
 
-  def embedded_schema_fields(schema) do
+  defp embedded_schema_fields(schema) do
     Enum.filter(schema.__schema__(:fields), fn field ->
       with {:embed, _} <- schema.__schema__(:type, field) do
         true
@@ -105,7 +112,7 @@ defmodule EctoMorph do
     end)
   end
 
-  def non_embedded_schema_fields(schema) do
+  defp non_embedded_schema_fields(schema) do
     Enum.filter(schema.__schema__(:fields), fn field ->
       with {:embed, _} <- schema.__schema__(:type, field) do
         false
