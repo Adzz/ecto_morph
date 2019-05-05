@@ -24,9 +24,9 @@ defmodule EctoMorph do
 
   UNTIL NOW!
 
-  Here we take care of casting the values in the json to the type that the given schema
-  defines, as well as turning the string keys into (existing) atoms. (We know they will be existing
-  atoms because they will exist in the schema definitions.)
+  Here we take care of casting the values in the json to the type that the given schema defines, as
+  well as turning the string keys into (existing) atoms. (We know they will be existing atoms
+  because they will exist in the schema definitions.)
 
   We filter out any keys that are not defined in the schema.
 
@@ -65,9 +65,9 @@ defmodule EctoMorph do
   end
 
   @doc """
-  Casts the given data into a changeset according to the types defined by the given
-  schema. It ignores any fields in data that are not defined in the schema, and
-  recursively casts any embedded fields to a changeset also.
+  Casts the given data into a changeset according to the types defined by the given schema. It
+  ignores any fields in data that are not defined in the schema, and recursively casts any embedded
+  fields to a changeset also.
   """
   def generate_changeset(data, schema) do
     with [] <- embedded_schema_fields(schema) do
@@ -83,12 +83,15 @@ defmodule EctoMorph do
     end
   end
 
+  @doc "Returns a map of all of the schema fields contained within data"
+  def filter_by_schema_fields(data, schema) do
+    Map.take(data, schema.__schema__(:fields))
+  end
+
   defp cast_all_the_embeds(changeset, embedded_fields) do
     Enum.reduce(embedded_fields, changeset, fn embedded_field, changeset ->
       Ecto.Changeset.cast_embed(changeset, embedded_field,
-        with: fn struct, changes ->
-          generate_changeset(changes, struct.__struct__)
-        end
+        with: fn struct, changes -> generate_changeset(changes, struct.__struct__) end
       )
     end)
   end
