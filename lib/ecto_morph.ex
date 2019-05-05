@@ -1,6 +1,7 @@
 defmodule EctoMorph do
   @moduledoc """
-  Utility functions for Ecto related stuff and things.
+  Utility functions for Ecto related stuff and things. Check out the functions docs to see what is
+  available.
   """
   @typep ecto_struct :: Ecto.Schema.t()
   @typep ecto_schema_module :: atom()
