@@ -40,6 +40,11 @@ with {:ok, %{status: 200, body: body}} <- HTTPoison.get("mygreatapi.co.uk") do
 end
 ```
 
+Check out the docs folder for more examples, table of contents below:
+
+- [Casting data]()
+- [Creating a has_one_of relation]()
+
 ## Installation
 
 [available in Hex](https://hex.pm/docs/publish), the package can be installed
