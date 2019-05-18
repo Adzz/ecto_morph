@@ -42,8 +42,8 @@ end
 
 Check out the docs folder for more examples, table of contents below:
 
-- [Casting data]()
-- [Creating a has_one_of relation]()
+- [Casting data](https://github.com/Adzz/ecto_morph/blob/master/docs/casting_data.md)
+- [Creating a has_one_of relation](https://github.com/Adzz/ecto_morph/blob/master/docs/has_one_of.md)
 
 ## Installation
 
