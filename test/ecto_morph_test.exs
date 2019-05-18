@@ -65,6 +65,10 @@ defmodule EctoMorphTest do
     end
   end
 
+  defmodule NonEctoStruct do
+    defstruct [:integer]
+  end
+
   setup do
     %{
       json: %{
@@ -133,6 +137,14 @@ defmodule EctoMorphTest do
                %SteamedHams{meat_type: "beef", pickles: 2, sauce_ratio: Decimal.new("0.5")},
                %SteamedHams{meat_type: "chicken", pickles: 1, sauce_ratio: Decimal.new("0.7")}
              ]
+    end
+
+    test "Allows structs as the map of data, simply calling Map.from_struct on it first" do
+      {:ok, result} = EctoMorph.to_struct(%SchemaUnderTest{integer: 1}, SchemaUnderTest)
+      assert result.integer == 1
+
+      {:ok, result} = EctoMorph.to_struct(%NonEctoStruct{integer: 1}, SchemaUnderTest)
+      assert result.integer == 1
     end
   end
 

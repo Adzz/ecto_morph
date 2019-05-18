@@ -29,7 +29,8 @@ defmodule EctoMorph do
   well as turning the string keys into (existing) atoms. (We know they will be existing atoms
   because they will exist in the schema definitions.)
 
-  We filter out any keys that are not defined in the schema.
+  We filter out any keys that are not defined in the schema, and if the first argument is a struct,
+  we call Map.from_struct/1 on it first. This can be useful for converting data between structs.
 
   Check out the test for more full examples.
 
@@ -60,6 +61,11 @@ defmodule EctoMorph do
   """
   @spec to_struct(map_with_string_keys, ecto_schema_module) ::
           {:ok, ecto_struct} | {:error, Ecto.Changeset.t()}
+  def to_struct(data = %{__struct__: _}, schema) do
+    Map.from_struct(data)
+    |> to_struct(schema)
+  end
+
   def to_struct(data, schema) do
     generate_changeset(data, schema)
     |> into_struct()
