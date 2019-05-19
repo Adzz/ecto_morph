@@ -150,3 +150,71 @@ end
 ```
 
 The important function here is the `cast`. Think of this as the function that takes the json from the jsonb column and turns it into an Elixir struct. We use pattern matching to decide what to do with the glob of json, relying on the fact that if it were a `Medal` it would have a `colour` field, and if it were a `PrizeMoney` it would have an `amount` field. Once we know that we can use `EctoMorph` to build the correct struct. And voila!
+
+So what would querying for a reward look like now?
+
+```elixir
+athlete = Repo.get(Athlete, 10)
+# There's no need to preload the relation, or do a join as its all in one column
+athlete.reward
+```
+
+Easy! And how about adding a new type of reward. Well first we would define the schema, let's pretend athletes now win discount vouchers for sporting goods. We first define the reward:
+
+```elixir
+defmodule DiscountVouchers do
+  use Ecto.Schema
+
+  embedded_schema do
+    field(:percentage_discount, :decimal)
+  end
+end
+```
+
+Then handle the new case in the custom Ecto type's `cast` function:
+
+```elixir
+  @doc "Casts data retrieved from the DB into the correct struct"
+  @impl true
+  def cast(reward = %{"amount" => _}), do: {:ok, EctoMorph.to_struct(reward, PrizeMoney)}
+  def cast(reward = %{"colour" => _}), do: {:ok, EctoMorph.to_struct(reward, Medal)}
+  def cast(reward = %{"percentage_discount" => _}), do: {:ok, EctoMorph.to_struct(reward, DiscountVouchers)}
+
+  def cast(reward) do
+    {:error, "Reward type #{inspect(reward)} is not supported"}
+  end
+```
+
+And that's it. What's really nice about this is if we want to do something with each reward, like say we want to calculate each reward's \$ value, we can use a protocol and define the specific conversion for each type cleanly.
+
+```elixir
+defprotocol DollarValue do
+  def for(reward)
+end
+
+defimpl DollarValue, for: Medal do
+  def for(medal = %{colour: "GOLD"}) do
+    1_000_000
+  end
+
+  def for(medal = %{colour: "SILVER"}) do
+    100_000
+  end
+
+  def for(medal = %{colour: "BRONZE"}) do
+    10_000
+  end
+end
+
+defimpl DollarValue, for: Prize do
+  def for(%{amonunt: amount}), do: amount
+end
+```
+
+Then use it like this:
+
+```elixir
+DollarValue.for(athlete.reward)
+```
+
+Pure unadulterated polymorphism. Yum!
