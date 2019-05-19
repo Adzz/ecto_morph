@@ -59,7 +59,7 @@ defmodule EctoMorph do
       ...> test.pageviews
       10
   """
-  @spec to_struct(map_with_string_keys, ecto_schema_module) ::
+  @spec to_struct(map_with_string_keys | ecto_struct, ecto_schema_module) ::
           {:ok, ecto_struct} | {:error, Ecto.Changeset.t()}
   def to_struct(data = %{__struct__: _}, schema) do
     Map.from_struct(data)
