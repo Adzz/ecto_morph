@@ -74,8 +74,13 @@ defmodule EctoMorph do
   @doc """
   Casts the given data into a changeset according to the types defined by the given schema. It
   ignores any fields in data that are not defined in the schema, and recursively casts any embedded
-  fields to a changeset also.
+  fields to a changeset also. Accepts a different struct as the first argument, calling Map.to_struct
+  on it first.
   """
+  def generate_changeset(data = %{__struct__: _}, schema) do
+    generate_changeset(Map.from_struct(data), schema)
+  end
+
   def generate_changeset(data, schema) do
     with [] <- embedded_schema_fields(schema) do
       schema

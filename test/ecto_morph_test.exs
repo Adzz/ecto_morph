@@ -221,6 +221,13 @@ defmodule EctoMorphTest do
       assert steamed_ham.errors == [pickles: {"is invalid", [type: :integer, validation: :cast]}]
       assert changes.aurora_borealis.valid?
     end
+
+    test "Accepts a struct as the first argument" do
+      changeset = EctoMorph.generate_changeset(%NonEctoStruct{integer: 1}, SchemaUnderTest)
+      assert changeset.valid?
+      assert changeset.changes == %{integer: 1}
+      assert changeset.errors == []
+    end
   end
 
   describe "into_struct/2" do
