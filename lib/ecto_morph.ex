@@ -132,7 +132,7 @@ defmodule EctoMorph do
     }
 
     fields_to_drop =
-      Enum.reduce(options, [], fn option, acc ->
+      Enum.reduce(options, [:__meta__], fn option, acc ->
         acc ++ Map.get(mapping, option, nil)
       end)
 
