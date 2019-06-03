@@ -17,6 +17,16 @@ defmodule EctoMorphTest do
     def load(_), do: raise("This will never be called")
   end
 
+  defmodule SchemaWithTimestamps do
+    use Ecto.Schema
+
+    embedded_schema do
+      field(:foo, :string)
+      field(:updated_at, :naive_datetime_usec)
+      field(:inserted_at, :naive_datetime_usec)
+    end
+  end
+
   defmodule SteamedHams do
     use Ecto.Schema
 
@@ -279,6 +289,39 @@ defmodule EctoMorphTest do
 
       assert changeset.errors == [date: {"is invalid", [type: :date, validation: :cast]}]
       refute changeset.valid?
+    end
+  end
+
+  describe "map_from_struct/2" do
+    test "creates a map from the struct, dropping the meta key" do
+      assert EctoMorph.map_from_struct(%SteamedHams{}) == %{
+               id: nil,
+               meat_type: nil,
+               pickles: nil,
+               sauce_ratio: nil
+             }
+    end
+
+    test "drops the timestamps if the option is given" do
+      assert EctoMorph.map_from_struct(%SchemaWithTimestamps{}, [:exclude_timestamps]) == %{
+               foo: nil,
+               id: nil
+             }
+    end
+
+    test "drops the id if the option is provided" do
+      assert EctoMorph.map_from_struct(%SchemaWithTimestamps{}, [:exclude_id]) == %{
+               foo: nil,
+               inserted_at: nil,
+               updated_at: nil
+             }
+    end
+
+    test "drops both if they are given" do
+      assert EctoMorph.map_from_struct(%SchemaWithTimestamps{}, [:exclude_id, :exclude_timestamps]) ==
+               %{
+                 foo: nil
+               }
     end
   end
 end

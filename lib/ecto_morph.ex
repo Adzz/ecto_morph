@@ -100,14 +100,6 @@ defmodule EctoMorph do
     Map.take(data, schema.__schema__(:fields))
   end
 
-  defp cast_all_the_embeds(changeset, embedded_fields) do
-    Enum.reduce(embedded_fields, changeset, fn embedded_field, changeset ->
-      Ecto.Changeset.cast_embed(changeset, embedded_field,
-        with: fn struct, changes -> generate_changeset(changes, struct.__struct__) end
-      )
-    end)
-  end
-
   @doc "Take a changeset and returns a struct if there are no errors on the changeset"
   def into_struct(changeset = %{errors: []}) do
     {:ok, Ecto.Changeset.apply_changes(changeset)}
@@ -115,6 +107,45 @@ defmodule EctoMorph do
 
   def into_struct(changeset) do
     {:error, changeset}
+  end
+
+  @doc """
+  Creates a map out of the Ecto struct, removing the internal ecto fields. Optionally you can remove
+  the inserted_at and updated_at timestamp fields also by passing in :exclude_timestamps as an option
+
+  ### Examples
+
+      iex> map_from_struct(%Test{}, [:exclude_timestamps])
+      %Test{foo: "bar", id: 10}
+
+      iex> map_from_struct(%Test{})
+      %Test{foo: "bar", updated_at: ~N[2000-01-01 23:00:07], inserted_at: ~N[2000-01-01 23:00:07], id: 10}
+
+      iex> map_from_struct(%Test{}, [:exclude_timestamps, :exclude_id])
+      %Test{foo: "bar"}
+  """
+  def map_from_struct(struct, options \\ []) do
+    mapping = %{
+      :exclude_timestamps => [:inserted_at, :updated_at],
+      :exclude_id => [:id],
+      nil => []
+    }
+
+    fields_to_drop =
+      Enum.reduce(options, [], fn option, acc ->
+        acc ++ Map.get(mapping, option, nil)
+      end)
+
+    Map.from_struct(struct)
+    |> Map.drop(fields_to_drop)
+  end
+
+  defp cast_all_the_embeds(changeset, embedded_fields) do
+    Enum.reduce(embedded_fields, changeset, fn embedded_field, changeset ->
+      Ecto.Changeset.cast_embed(changeset, embedded_field,
+        with: fn struct, changes -> generate_changeset(changes, struct.__struct__) end
+      )
+    end)
   end
 
   defp embedded_schema_fields(schema) do
