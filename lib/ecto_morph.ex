@@ -101,7 +101,7 @@ defmodule EctoMorph do
   end
 
   @doc "Take a changeset and returns a struct if there are no errors on the changeset"
-  def into_struct(changeset = %{errors: []}) do
+  def into_struct(changeset = %{valid?: true}) do
     {:ok, Ecto.Changeset.apply_changes(changeset)}
   end
 

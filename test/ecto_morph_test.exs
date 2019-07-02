@@ -156,6 +156,65 @@ defmodule EctoMorphTest do
       {:ok, result} = EctoMorph.to_struct(%NonEctoStruct{integer: 1}, SchemaUnderTest)
       assert result.integer == 1
     end
+
+    test "returns an invalid changeset when an embeds_many embed is invalid" do
+      json = %{
+        "steamed_hams" => [
+          %{"meat_type" => "beef", "pickles" => false, "sauce_ratio" => "0.5"}
+        ],
+        "aurora_borealis" => %{
+          "location" => "Kitchen",
+          "probability" => "0.001",
+          "actually_a_fire?" => false
+        },
+        "field_to_ignore" => "ensures we just ignore fields that are not part of the schema"
+      }
+
+      {:error,
+       %Ecto.Changeset{
+         valid?: false,
+         errors: [],
+         data: %SchemaUnderTest{},
+         changes: changes
+       }} = EctoMorph.to_struct(json, SchemaUnderTest)
+
+      [steamed_ham] = changes.steamed_hams
+
+      refute steamed_ham.valid?
+      assert steamed_ham.errors == [pickles: {"is invalid", [type: :integer, validation: :cast]}]
+      assert changes.aurora_borealis.valid?
+    end
+
+    test "returns an invalid changeset when a embeds_one embed is invalid" do
+      json = %{
+        "steamed_hams" => [
+          %{"meat_type" => "beef", "pickles" => 2, "sauce_ratio" => "0.5"}
+        ],
+        "aurora_borealis" => %{
+          "location" => "Kitchen",
+          "probability" => "0.001",
+          "actually_a_fire?" => "YES"
+        },
+        "field_to_ignore" => "ensures we just ignore fields that are not part of the schema"
+      }
+
+      {:error,
+       %Ecto.Changeset{
+         valid?: false,
+         errors: [],
+         data: %SchemaUnderTest{},
+         changes: changes
+       }} = EctoMorph.to_struct(json, SchemaUnderTest)
+
+      refute changes.aurora_borealis.valid?
+
+      assert changes.aurora_borealis.errors == [
+               actually_a_fire?: {"is invalid", [type: :boolean, validation: :cast]}
+             ]
+
+      [steamed_ham] = changes.steamed_hams
+      assert steamed_ham.valid?
+    end
   end
 
   describe "generate_changeset/2" do
