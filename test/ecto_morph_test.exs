@@ -27,6 +27,14 @@ defmodule EctoMorphTest do
     end
   end
 
+  defmodule DoubleNestedSchema do
+    use Ecto.Schema
+
+    embedded_schema do
+      field(:value, :string)
+    end
+  end
+
   defmodule SteamedHams do
     use Ecto.Schema
 
@@ -34,6 +42,7 @@ defmodule EctoMorphTest do
       field(:meat_type, :string)
       field(:pickles, :integer)
       field(:sauce_ratio, :decimal)
+      embeds_one(:double_nested_schema, DoubleNestedSchema)
     end
   end
 
@@ -100,7 +109,12 @@ defmodule EctoMorphTest do
         "utc_datetime_usec" => "2019-04-08T14:31:14.366732Z",
         "steamed_hams" => [
           %{"meat_type" => "beef", "pickles" => 2, "sauce_ratio" => "0.5"},
-          %{"meat_type" => "chicken", "pickles" => 1, "sauce_ratio" => "0.7"}
+          %{
+            "meat_type" => "chicken",
+            "pickles" => 1,
+            "sauce_ratio" => "0.7",
+            "double_nested_schema" => %{"value" => "works!"}
+          }
         ],
         "aurora_borealis" => %{
           "location" => "Kitchen",
@@ -144,8 +158,18 @@ defmodule EctoMorphTest do
              }
 
       assert schema_under_test.steamed_hams == [
-               %SteamedHams{meat_type: "beef", pickles: 2, sauce_ratio: Decimal.new("0.5")},
-               %SteamedHams{meat_type: "chicken", pickles: 1, sauce_ratio: Decimal.new("0.7")}
+               %SteamedHams{
+                 meat_type: "beef",
+                 pickles: 2,
+                 sauce_ratio: Decimal.new("0.5"),
+                 double_nested_schema: nil
+               },
+               %SteamedHams{
+                 meat_type: "chicken",
+                 pickles: 1,
+                 sauce_ratio: Decimal.new("0.7"),
+                 double_nested_schema: %DoubleNestedSchema{value: "works!"}
+               }
              ]
     end
 
@@ -214,6 +238,42 @@ defmodule EctoMorphTest do
 
       [steamed_ham] = changes.steamed_hams
       assert steamed_ham.valid?
+    end
+
+    test "Allows us to specify a subset of fields", %{json: json} do
+      {:ok, schema_under_test = %SchemaUnderTest{}} =
+        EctoMorph.to_struct(json, SchemaUnderTest, [
+          :boolean,
+          :name,
+          :binary,
+          :array_of_ints,
+          steamed_hams: [:pickles, double_nested_schema: [:value]]
+        ])
+
+      assert schema_under_test.boolean == false
+      assert schema_under_test.name == "Super Nintendo Chalmers"
+      assert schema_under_test.binary == "It's a regional dialect"
+      assert schema_under_test.array_of_ints == [1, 2, 3, 4]
+
+      assert schema_under_test.steamed_hams == [
+               %EctoMorphTest.SteamedHams{
+                 double_nested_schema: nil,
+                 id: nil,
+                 meat_type: nil,
+                 pickles: 2,
+                 sauce_ratio: nil
+               },
+               %EctoMorphTest.SteamedHams{
+                 double_nested_schema: %EctoMorphTest.DoubleNestedSchema{
+                   id: nil,
+                   value: "works!"
+                 },
+                 id: nil,
+                 meat_type: nil,
+                 pickles: 1,
+                 sauce_ratio: nil
+               }
+             ]
     end
   end
 
@@ -335,8 +395,18 @@ defmodule EctoMorphTest do
              }
 
       assert schema_under_test.steamed_hams == [
-               %SteamedHams{meat_type: "beef", pickles: 2, sauce_ratio: Decimal.new("0.5")},
-               %SteamedHams{meat_type: "chicken", pickles: 1, sauce_ratio: Decimal.new("0.7")}
+               %SteamedHams{
+                 meat_type: "beef",
+                 pickles: 2,
+                 sauce_ratio: Decimal.new("0.5"),
+                 double_nested_schema: nil
+               },
+               %SteamedHams{
+                 meat_type: "chicken",
+                 pickles: 1,
+                 sauce_ratio: Decimal.new("0.7"),
+                 double_nested_schema: %DoubleNestedSchema{value: "works!"}
+               }
              ]
     end
 
@@ -357,7 +427,8 @@ defmodule EctoMorphTest do
                id: nil,
                meat_type: nil,
                pickles: nil,
-               sauce_ratio: nil
+               sauce_ratio: nil,
+               double_nested_schema: nil
              }
     end
 

@@ -32,6 +32,19 @@ defmodule EctoMorph do
   We filter out any keys that are not defined in the schema, and if the first argument is a struct,
   we call Map.from_struct/1 on it first. This can be useful for converting data between structs.
 
+  Alternatively you can pass in a list of fields that you allow updates / inserts on. This list of
+  fields can define fields for inner schemas also like so:
+
+  ```elixir
+    EctoMorph.to_struct(json, SchemaUnderTest, [
+      :boolean,
+      :name,
+      :binary,
+      :array_of_ints,
+      steamed_hams: [:pickles, double_nested_schema: [:value]]
+    ])
+  ```
+
   Check out the test for more full examples.
 
   ### Examples
@@ -61,14 +74,43 @@ defmodule EctoMorph do
   """
   @spec to_struct(map_with_string_keys | ecto_struct, ecto_schema_module) ::
           {:ok, ecto_struct} | {:error, Ecto.Changeset.t()}
+  @spec to_struct(map_with_string_keys | ecto_struct, ecto_schema_module, list) ::
+          {:ok, ecto_struct} | {:error, Ecto.Changeset.t()}
   def to_struct(data = %{__struct__: _}, schema), do: Map.from_struct(data) |> to_struct(schema)
   def to_struct(data, schema), do: generate_changeset(data, schema) |> into_struct()
+
+  def to_struct(data = %{__struct__: _}, schema, fields) do
+    Map.from_struct(data) |> to_struct(schema, fields)
+  end
+
+  def to_struct(data, schema, fields) do
+    generate_changeset(data, schema, fields)
+    |> into_struct
+  end
 
   @doc """
   Casts the given data into a changeset according to the types defined by the given schema. It
   ignores any fields in data that are not defined in the schema, and recursively casts any embedded
   fields to a changeset also. Accepts a different struct as the first argument, calling Map.to_struct
   on it first.
+
+  If provided, it will filter the fields to cast in the data to only those in the given field list.
+  This list can be nested:
+
+  ```elixir
+      ...> data = %{
+      ...>  "integer" => "77",
+      ...>  "steamed_hams" => [%{
+      ...>    "pickles" => 1,
+      ...>    "sauce_ratio" => "0.7",
+      ...>    "double_nested_schema" => %{"value" => "works!"}
+      ...>  }],
+      ...> }
+      ...> EctoMorph.generate_changeset(data, SchemaUnderTest, [
+      ...>   :integer,
+      ...>   steamed_hams: [:pickles, double_nested_schema: [:value]]
+      ...> ])
+  ```
   """
   @spec generate_changeset(map() | ecto_struct, ecto_schema_module) ::
           {:ok, Ecto.Changeset.t()} | {:error, Ecto.Changeset.t()}
@@ -87,6 +129,26 @@ defmodule EctoMorph do
         |> struct(%{})
         |> Ecto.Changeset.cast(data, non_embedded_schema_fields(schema))
         |> cast_all_the_embeds(embedded_fields)
+    end
+  end
+
+  @spec generate_changeset(map() | ecto_struct, ecto_schema_module, list) ::
+          {:ok, Ecto.Changeset.t()} | {:error, Ecto.Changeset.t()}
+  def generate_changeset(data = %{__struct__: _}, schema, fields) do
+    generate_changeset(Map.from_struct(data), schema, fields)
+  end
+
+  def generate_changeset(data, schema, fields) do
+    with [] <- embedded_allowed_fields(fields) do
+      schema
+      |> struct(%{})
+      |> Ecto.Changeset.cast(data, fields)
+    else
+      embedded_fields ->
+        schema
+        |> struct(%{})
+        |> Ecto.Changeset.cast(data, non_embedded_allowed_fields(fields))
+        |> cast_embeded_fields(embedded_fields)
     end
   end
 
@@ -137,11 +199,37 @@ defmodule EctoMorph do
     |> Map.drop(fields_to_drop)
   end
 
+  defp cast_embeded_fields(changeset, embedded_fields) do
+    Enum.reduce(embedded_fields, changeset, fn {embedded_field, fields}, changeset ->
+      Ecto.Changeset.cast_embed(changeset, embedded_field,
+        with: fn struct, changes ->
+          generate_changeset(changes, struct.__struct__, fields)
+        end
+      )
+    end)
+  end
+
   defp cast_all_the_embeds(changeset, embedded_fields) do
     Enum.reduce(embedded_fields, changeset, fn embedded_field, changeset ->
       Ecto.Changeset.cast_embed(changeset, embedded_field,
         with: fn struct, changes -> generate_changeset(changes, struct.__struct__) end
       )
+    end)
+  end
+
+  defp non_embedded_allowed_fields(fields) do
+    fields
+    |> Enum.filter(fn
+      {_embedded_field_name, _field} -> false
+      field when is_atom(field) -> true
+    end)
+  end
+
+  defp embedded_allowed_fields(fields) do
+    fields
+    |> Enum.filter(fn
+      {_embedded_field_name, _field} -> true
+      field when is_atom(field) -> false
     end)
   end
 
