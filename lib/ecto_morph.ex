@@ -61,15 +61,8 @@ defmodule EctoMorph do
   """
   @spec to_struct(map_with_string_keys | ecto_struct, ecto_schema_module) ::
           {:ok, ecto_struct} | {:error, Ecto.Changeset.t()}
-  def to_struct(data = %{__struct__: _}, schema) do
-    Map.from_struct(data)
-    |> to_struct(schema)
-  end
-
-  def to_struct(data, schema) do
-    generate_changeset(data, schema)
-    |> into_struct()
-  end
+  def to_struct(data = %{__struct__: _}, schema), do: Map.from_struct(data) |> to_struct(schema)
+  def to_struct(data, schema), do: generate_changeset(data, schema) |> into_struct()
 
   @doc """
   Casts the given data into a changeset according to the types defined by the given schema. It
@@ -77,6 +70,8 @@ defmodule EctoMorph do
   fields to a changeset also. Accepts a different struct as the first argument, calling Map.to_struct
   on it first.
   """
+  @spec generate_changeset(map() | ecto_struct, ecto_schema_module) ::
+          {:ok, Ecto.Changeset.t()} | {:error, Ecto.Changeset.t()}
   def generate_changeset(data = %{__struct__: _}, schema) do
     generate_changeset(Map.from_struct(data), schema)
   end
@@ -96,18 +91,18 @@ defmodule EctoMorph do
   end
 
   @doc "Returns a map of all of the schema fields contained within data"
+  @spec filter_by_schema_fields(map(), ecto_schema_module) :: map()
   def filter_by_schema_fields(data, schema) do
     Map.take(data, schema.__schema__(:fields))
   end
 
-  @doc "Take a changeset and returns a struct if there are no errors on the changeset"
-  def into_struct(changeset = %{valid?: true}) do
-    {:ok, Ecto.Changeset.apply_changes(changeset)}
-  end
-
-  def into_struct(changeset) do
-    {:error, changeset}
-  end
+  @doc """
+  Take a changeset and returns a struct if there are no errors on the changeset. Returns an error
+  tuple with the invalid changeset otherwise.
+  """
+  @spec into_struct(Ecto.Changeset.t()) :: {:ok, ecto_struct} | {:error, Ecto.Changeset.t()}
+  def into_struct(changeset = %{valid?: true}), do: {:ok, Ecto.Changeset.apply_changes(changeset)}
+  def into_struct(changeset), do: {:error, changeset}
 
   @doc """
   Creates a map out of the Ecto struct, removing the internal ecto fields. Optionally you can remove
@@ -124,6 +119,8 @@ defmodule EctoMorph do
       iex> map_from_struct(%Test{}, [:exclude_timestamps, :exclude_id])
       %Test{foo: "bar"}
   """
+  @spec map_from_struct(ecto_struct) :: map()
+  @spec map_from_struct(ecto_struct, list()) :: map()
   def map_from_struct(struct, options \\ []) do
     mapping = %{
       :exclude_timestamps => [:inserted_at, :updated_at],
