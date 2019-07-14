@@ -93,27 +93,8 @@ defmodule EctoMorph do
   ignores any fields in data that are not defined in the schema, and recursively casts any embedded
   fields to a changeset also. Accepts a different struct as the first argument, calling Map.to_struct
   on it first.
-
-  If provided, it will filter the fields to cast in the data to only those in the given field list.
-  This list can be nested:
-
-  ```elixir
-      ...> data = %{
-      ...>  "integer" => "77",
-      ...>  "steamed_hams" => [%{
-      ...>    "pickles" => 1,
-      ...>    "sauce_ratio" => "0.7",
-      ...>    "double_nested_schema" => %{"value" => "works!"}
-      ...>  }],
-      ...> }
-      ...> EctoMorph.generate_changeset(data, SchemaUnderTest, [
-      ...>   :integer,
-      ...>   steamed_hams: [:pickles, double_nested_schema: [:value]]
-      ...> ])
-  ```
   """
-  @spec generate_changeset(map() | ecto_struct, ecto_schema_module) ::
-          {:ok, Ecto.Changeset.t()} | {:error, Ecto.Changeset.t()}
+  @spec generate_changeset(map() | ecto_struct, ecto_schema_module) :: Ecto.Changeset.t()
   def generate_changeset(data = %{__struct__: _}, schema) do
     generate_changeset(Map.from_struct(data), schema)
   end
@@ -132,8 +113,45 @@ defmodule EctoMorph do
     end
   end
 
-  @spec generate_changeset(map() | ecto_struct, ecto_schema_module, list) ::
-          {:ok, Ecto.Changeset.t()} | {:error, Ecto.Changeset.t()}
+  @spec generate_changeset(map() | ecto_struct, ecto_schema_module, list) :: Ecto.Changeset.t()
+  @doc """
+  Takes in a map of data and creates a changeset out of it by casting the data recursively, according
+  to the whitelist of fields in fields. The map of data may be a struct, and the fields whitelist
+  can whitelist fields of nested relations by providing a list for them as well.
+
+  ### Examples
+
+  If we provide a whitelist of fields, we will be passed a changeset for the changes on those fields
+  only:
+  ```elixir
+      ...> data = %{
+      ...>  "integer" => "77",
+      ...>  "steamed_hams" => [%{
+      ...>    "pickles" => 1,
+      ...>    "sauce_ratio" => "0.7",
+      ...>    "double_nested_schema" => %{"value" => "works!"}
+      ...>  }],
+      ...> }
+      ...> EctoMorph.generate_changeset(data, SchemaUnderTest, [:integer])
+      ...>
+  ```
+
+  We can also define whitelists for any arbitrarily deep relation like so:
+  ```elixir
+      ...> data = %{
+      ...>  "integer" => "77",
+      ...>  "steamed_hams" => [%{
+      ...>    "pickles" => 1,
+      ...>    "sauce_ratio" => "0.7",
+      ...>    "double_nested_schema" => %{"value" => "works!"}
+      ...>  }],
+      ...> }
+      ...> EctoMorph.generate_changeset(data, SchemaUnderTest, [
+      ...>   :integer,
+      ...>   steamed_hams: [:pickles, double_nested_schema: [:value]]
+      ...> ])
+  ```
+  """
   def generate_changeset(data = %{__struct__: _}, schema, fields) do
     generate_changeset(Map.from_struct(data), schema, fields)
   end

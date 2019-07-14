@@ -16,11 +16,7 @@ defmodule EctoMorph.MixProject do
     ]
   end
 
-  def application do
-    [
-      extra_applications: [:logger]
-    ]
-  end
+  def application, do: [extra_applications: [:logger]]
 
   defp deps do
     [
@@ -29,9 +25,7 @@ defmodule EctoMorph.MixProject do
     ]
   end
 
-  defp description() do
-    "A utility library for Ecto"
-  end
+  defp description(), do: "A utility library for Ecto"
 
   defp package() do
     [

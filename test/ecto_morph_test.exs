@@ -357,6 +357,52 @@ defmodule EctoMorphTest do
       assert changeset.changes == %{integer: 1}
       assert changeset.errors == []
     end
+
+    test "Allows us to specify a subset of fields - nested relations", %{json: json} do
+      changeset =
+        %Ecto.Changeset{} =
+        EctoMorph.generate_changeset(json, SchemaUnderTest, [
+          :boolean,
+          :name,
+          :binary,
+          :array_of_ints,
+          steamed_hams: [:pickles, double_nested_schema: [:value]]
+        ])
+
+      assert changeset.valid? == true
+
+      assert %{
+               array_of_ints: [1, 2, 3, 4],
+               binary: "It's a regional dialect",
+               boolean: false,
+               name: "Super Nintendo Chalmers",
+               steamed_hams: [
+                 %Ecto.Changeset{
+                   action: :insert,
+                   changes: %{pickles: 2},
+                   errors: [],
+                   data: %EctoMorphTest.SteamedHams{},
+                   valid?: true
+                 },
+                 %Ecto.Changeset{
+                   action: :insert,
+                   changes: %{
+                     double_nested_schema: %Ecto.Changeset{
+                       action: :insert,
+                       changes: %{value: "works!"},
+                       errors: [],
+                       data: %EctoMorphTest.DoubleNestedSchema{},
+                       valid?: true
+                     },
+                     pickles: 1
+                   },
+                   errors: [],
+                   data: %EctoMorphTest.SteamedHams{},
+                   valid?: true
+                 }
+               ]
+             } = changeset.changes
+    end
   end
 
   describe "into_struct/2" do
