@@ -7,7 +7,7 @@ defmodule EctoMorph.MixProject do
       app: :ecto_morph,
       licenses: "",
       description: description(),
-      version: "0.1.8",
+      version: "0.1.9",
       package: package(),
       elixir: "~> 1.8",
       start_permanent: Mix.env() == :prod,

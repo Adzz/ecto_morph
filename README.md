@@ -40,6 +40,13 @@ with {:ok, %{status: 200, body: body}} <- HTTPoison.get("mygreatapi.co.uk") do
 end
 ```
 
+We can also whitelist fields to cast / update:
+
+```elixir
+EctoMorph.to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing])
+EctoMorph.to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing, embed: [:bar]])
+```
+
 Check out the docs folder for more examples, table of contents below:
 
 - [Casting data](https://github.com/Adzz/ecto_morph/blob/master/docs/casting_data.md)
