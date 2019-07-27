@@ -60,6 +60,21 @@ EctoMorph.map_from_struct(%Test{}, [:exclude_timestamps, :exclude_id])
 %Test{foo: "bar"}
 ```
 
+and being able to filter some data by the fields in the given schema:
+
+```elixir
+defmodule Test do
+  use Ecto.Schema
+
+  embedded_schema do
+    field(:random, :string)
+  end
+end
+
+EctoMorph.filter_by_schema_fields(%{"random" => "data", "more" => "fields"}, Test)
+%{"random" => "data"}
+```
+
 Check out the docs folder for more examples, table of contents below:
 
 - [Casting data](https://github.com/Adzz/ecto_morph/blob/master/docs/casting_data.md)
