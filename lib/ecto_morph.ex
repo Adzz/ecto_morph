@@ -32,20 +32,7 @@ defmodule EctoMorph do
   We filter out any keys that are not defined in the schema, and if the first argument is a struct,
   we call Map.from_struct/1 on it first. This can be useful for converting data between structs.
 
-  Alternatively you can pass in a list of fields that you allow updates / inserts on. This list of
-  fields can define fields for inner schemas also like so:
-
-  ```elixir
-    EctoMorph.to_struct(json, SchemaUnderTest, [
-      :boolean,
-      :name,
-      :binary,
-      :array_of_ints,
-      steamed_hams: [:pickles, double_nested_schema: [:value]]
-    ])
-  ```
-
-  Check out the test for more full examples.
+  Check out the tests for more full examples.
 
   ### Examples
 
@@ -79,6 +66,26 @@ defmodule EctoMorph do
   def to_struct(data = %{__struct__: _}, schema), do: Map.from_struct(data) |> to_struct(schema)
   def to_struct(data, schema), do: generate_changeset(data, schema) |> into_struct()
 
+  @doc """
+  Takes some data and tries to convert it to a struct in the shape of the given schema. Casts values
+  to the types defined by the schema dynamically using ecto changesets.
+
+  Accepts a whitelist of fields that you allow updates / inserts on. This list of fields can define
+  fields for inner schemas also like so:
+
+  ```elixir
+    EctoMorph.to_struct(json, SchemaUnderTest, [
+      :boolean,
+      :name,
+      :binary,
+      :array_of_ints,
+      steamed_hams: [:pickles, double_nested_schema: [:value]]
+    ])
+  ```
+
+  We filter out any keys that are not defined in the schema, and if the first argument is a struct,
+  we call Map.from_struct/1 on it first. This can be useful for converting data between structs.
+  """
   def to_struct(data = %{__struct__: _}, schema, fields) do
     Map.from_struct(data) |> to_struct(schema, fields)
   end

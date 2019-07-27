@@ -47,6 +47,19 @@ EctoMorph.to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:th
 EctoMorph.to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing, embed: [:bar]])
 ```
 
+Other abilities include creating a map from an ecto struct, dropping optional fields if you decide to:
+
+```elixir
+EctoMorph.map_from_struct(%Test{})
+%Test{foo: "bar", updated_at: ~N[2000-01-01 23:00:07], inserted_at: ~N[2000-01-01 23:00:07], id: 10}
+
+EctoMorph.map_from_struct(%Test{}, [:exclude_timestamps])
+%Test{foo: "bar", id: 10}
+
+EctoMorph.map_from_struct(%Test{}, [:exclude_timestamps, :exclude_id])
+%Test{foo: "bar"}
+```
+
 Check out the docs folder for more examples, table of contents below:
 
 - [Casting data](https://github.com/Adzz/ecto_morph/blob/master/docs/casting_data.md)
