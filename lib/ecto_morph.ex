@@ -96,14 +96,43 @@ defmodule EctoMorph do
   end
 
   @doc """
-  Casts the given data into a changeset according to the types defined by the given schema. It
-  ignores any fields in data that are not defined in the schema, and recursively casts any embedded
+  Casts the given data into a changeset according to the types defined by the given `schema`. It
+  ignores any fields in `data` that are not defined in the schema, and recursively casts any embedded
   fields to a changeset also. Accepts a different struct as the first argument, calling Map.to_struct
-  on it first.
+  on it first. Also allows the schema to be an existing struct, in which case it will infer the schema
+  from the struct, and effectively update that struct with the changes supplied in data.
+
+  ### Examples
+
+  ```elixir
+      ...> data = %{
+      ...>  "integer" => "77",
+      ...>  "steamed_hams" => [%{
+      ...>    "pickles" => 1,
+      ...>    "sauce_ratio" => "0.7",
+      ...>    "double_nested_schema" => %{"value" => "works!"}
+      ...>  }],
+      ...> }
+      ...> EctoMorph.generate_changeset(data, %SchemaUnderTest{integer: 2})
+      ...>
+  ```
   """
-  @spec generate_changeset(map() | ecto_struct, ecto_schema_module) :: Ecto.Changeset.t()
+  @spec generate_changeset(map() | ecto_struct, ecto_schema_module | ecto_struct) ::
+          Ecto.Changeset.t()
   def generate_changeset(data = %{__struct__: _}, schema) do
     generate_changeset(Map.from_struct(data), schema)
+  end
+
+  def generate_changeset(data, current = %{__struct__: schema}) do
+    with [] <- embedded_schema_fields(schema) do
+      current
+      |> Ecto.Changeset.cast(data, schema.__schema__(:fields))
+    else
+      embedded_fields ->
+        current
+        |> Ecto.Changeset.cast(data, non_embedded_schema_fields(schema))
+        |> cast_all_the_embeds(embedded_fields)
+    end
   end
 
   def generate_changeset(data, schema) do
@@ -120,7 +149,6 @@ defmodule EctoMorph do
     end
   end
 
-  @spec generate_changeset(map() | ecto_struct, ecto_schema_module, list) :: Ecto.Changeset.t()
   @doc """
   Takes in a map of data and creates a changeset out of it by casting the data recursively, according
   to the whitelist of fields in fields. The map of data may be a struct, and the fields whitelist
@@ -159,19 +187,21 @@ defmodule EctoMorph do
       ...> ])
   ```
   """
-  def generate_changeset(data = %{__struct__: _}, schema, fields) do
-    generate_changeset(Map.from_struct(data), schema, fields)
+  @spec generate_changeset(map() | ecto_struct, ecto_schema_module | ecto_struct, list) ::
+          Ecto.Changeset.t()
+  def generate_changeset(data = %{__struct__: _}, schema_or_existing_struct, fields) do
+    generate_changeset(Map.from_struct(data), schema_or_existing_struct, fields)
   end
 
-  def generate_changeset(data, schema, fields) do
+  def generate_changeset(data, schema_or_existing_struct, fields) do
     with [] <- embedded_allowed_fields(fields) do
-      schema
-      |> struct(%{})
+      schema_or_existing_struct
+      |> struct!(%{})
       |> Ecto.Changeset.cast(data, fields)
     else
       embedded_fields ->
-        schema
-        |> struct(%{})
+        schema_or_existing_struct
+        |> struct!(%{})
         |> Ecto.Changeset.cast(data, non_embedded_allowed_fields(fields))
         |> cast_embeded_fields(embedded_fields)
     end

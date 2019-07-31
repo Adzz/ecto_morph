@@ -181,6 +181,19 @@ defmodule EctoMorphTest do
       assert result.integer == 1
     end
 
+    test "Allows schema to be a struct, simply updating it if so" do
+      struct_to_update = %SchemaUnderTest{integer: 2, binary: "yis"}
+
+      {:ok, result} = EctoMorph.to_struct(%{integer: 1}, struct_to_update)
+
+      assert result.integer == 1
+      assert result.binary == "yis"
+
+      {:ok, result} = EctoMorph.to_struct(%{integer: 1}, struct_to_update)
+      assert result.integer == 1
+      assert result.binary == "yis"
+    end
+
     test "returns an invalid changeset when an embeds_many embed is invalid" do
       json = %{
         "steamed_hams" => [
@@ -249,6 +262,48 @@ defmodule EctoMorphTest do
           :array_of_ints,
           steamed_hams: [:pickles, double_nested_schema: [:value]]
         ])
+
+      assert schema_under_test.boolean == false
+      assert schema_under_test.name == "Super Nintendo Chalmers"
+      assert schema_under_test.binary == "It's a regional dialect"
+      assert schema_under_test.array_of_ints == [1, 2, 3, 4]
+
+      assert schema_under_test.steamed_hams == [
+               %EctoMorphTest.SteamedHams{
+                 double_nested_schema: nil,
+                 id: nil,
+                 meat_type: nil,
+                 pickles: 2,
+                 sauce_ratio: nil
+               },
+               %EctoMorphTest.SteamedHams{
+                 double_nested_schema: %EctoMorphTest.DoubleNestedSchema{
+                   id: nil,
+                   value: "works!"
+                 },
+                 id: nil,
+                 meat_type: nil,
+                 pickles: 1,
+                 sauce_ratio: nil
+               }
+             ]
+    end
+
+    test "Allows the schema to be a struct whereby that struct will be updated - whitelisting fields",
+         %{
+           json: json
+         } do
+      {:ok, schema_under_test = %SchemaUnderTest{}} =
+        EctoMorph.to_struct(
+          json,
+          %SchemaUnderTest{binary: "test", name: "Super Nintendo Chalmers"},
+          [
+            :boolean,
+            :binary,
+            :array_of_ints,
+            steamed_hams: [:pickles, double_nested_schema: [:value]]
+          ]
+        )
 
       assert schema_under_test.boolean == false
       assert schema_under_test.name == "Super Nintendo Chalmers"
@@ -358,10 +413,65 @@ defmodule EctoMorphTest do
       assert changeset.errors == []
     end
 
+    test "Accepts a struct as the schema" do
+      changeset = EctoMorph.generate_changeset(%NonEctoStruct{integer: 1}, %SchemaUnderTest{})
+      assert changeset.valid?
+      assert changeset.changes == %{integer: 1}
+      assert changeset.errors == []
+    end
+
     test "Allows us to specify a subset of fields - nested relations", %{json: json} do
       changeset =
         %Ecto.Changeset{} =
         EctoMorph.generate_changeset(json, SchemaUnderTest, [
+          :boolean,
+          :name,
+          :binary,
+          :array_of_ints,
+          steamed_hams: [:pickles, double_nested_schema: [:value]]
+        ])
+
+      assert changeset.valid? == true
+
+      assert %{
+               array_of_ints: [1, 2, 3, 4],
+               binary: "It's a regional dialect",
+               boolean: false,
+               name: "Super Nintendo Chalmers",
+               steamed_hams: [
+                 %Ecto.Changeset{
+                   action: :insert,
+                   changes: %{pickles: 2},
+                   errors: [],
+                   data: %EctoMorphTest.SteamedHams{},
+                   valid?: true
+                 },
+                 %Ecto.Changeset{
+                   action: :insert,
+                   changes: %{
+                     double_nested_schema: %Ecto.Changeset{
+                       action: :insert,
+                       changes: %{value: "works!"},
+                       errors: [],
+                       data: %EctoMorphTest.DoubleNestedSchema{},
+                       valid?: true
+                     },
+                     pickles: 1
+                   },
+                   errors: [],
+                   data: %EctoMorphTest.SteamedHams{},
+                   valid?: true
+                 }
+               ]
+             } = changeset.changes
+    end
+
+    test "Allows us to specify a subset of fields - nested relations with schema as a struct", %{
+      json: json
+    } do
+      changeset =
+        %Ecto.Changeset{} =
+        EctoMorph.generate_changeset(json, %SchemaUnderTest{}, [
           :boolean,
           :name,
           :binary,

@@ -1,6 +1,6 @@
 # Using EctoMorph to create a has_one_of association
 
-So what do I mean by `has_one_of`? Well sometimes when modeling data we want to say something like "this thing can be one of these types of things". That is to say, our thing can be one of a group of possibilities, and can only be one of those at any one time. Why is this a useful way to talk about data? Isn't that just a has_one anyway? Let's look at an example to see...
+So what do I mean by `has_one_of`? Well sometimes when modelling data we want to say something like "this thing can be one of these types of things". That is to say, our thing can be one of a group of possibilities, and can only be one of those at any one time. Why is this a useful way to talk about data? Isn't that just a has_one anyway? Let's look at an example to see...
 
 We want to track athletes and their results in different events. To begin with we decide to have athletes, who have_one medal. The schemas would look like this:
 
@@ -79,7 +79,7 @@ end
 
 It gets even worse if we want to start validating in the application layer the creation of `Athlete`s so that you cannot have both a `medal` and a `prize`.
 
-So can we do better? Can we move away from violating the tell don't ask principle and move towards a better domain model? Yes. The relationship we want is `has_on_of`. We want to be able to say that an Athlete's winnings are one of a set of possible things. Can we do that in Ecto? Yes it is possible, but it's a bit out of left field. The key is to notice that medals and prize money are two types of a more generic thing. We could call it a `Reward` for now. The approach we are going to take is to add a jsonb `reward` column to the `athletes` table, and let that be a custom ecto type which decides what specific reward we have. Let's step through the code to see what that would look like. First our Athlete schema will now look something like this:
+So can we do better? Can we move away from violating the tell don't ask principle and move towards a better domain model? Yes. The relationship we want is `has_one_of`. We want to be able to say that an Athlete's winnings are one of a set of possible things. Can we do that in Ecto? Yes it is possible, but it's a bit out of left field. The key is to notice that medals and prize money are two types of a more generic thing. We could call it a `Reward` for now. The approach we are going to take is to add a jsonb `reward` column to the `athletes` table, and let that be a custom ecto type which decides what specific reward we have. Let's step through the code to see what that would look like. First our Athlete schema will now look something like this:
 
 ```elixir
 defmodule Athlete do
