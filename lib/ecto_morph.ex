@@ -4,8 +4,9 @@ defmodule EctoMorph do
   available.
   """
   @typep ecto_struct :: Ecto.Schema.t()
-  @typep ecto_schema_module :: atom()
-  @typep map_with_string_keys :: %{required(String.t()) => any()}
+  @typep schema_module :: atom()
+  @typep okay_struct :: {:ok, ecto_struct}
+  @typep error_changeset :: {:error, Ecto.Changeset.t()}
 
   @doc """
   Takes some data and tries to convert it to a struct in the shape of the given schema. Casts values
@@ -59,10 +60,10 @@ defmodule EctoMorph do
       ...> test.pageviews
       10
   """
-  @spec to_struct(map_with_string_keys | ecto_struct, ecto_schema_module) ::
-          {:ok, ecto_struct} | {:error, Ecto.Changeset.t()}
-  @spec to_struct(map_with_string_keys | ecto_struct, ecto_schema_module, list) ::
-          {:ok, ecto_struct} | {:error, Ecto.Changeset.t()}
+  # This should probably be called `cast_to_struct` to show what it does
+  @spec to_struct(map | ecto_struct, schema_module) :: okay_struct | error_changeset
+  @since "0.1.11"
+  @deprecated "to_struct/2 has been deprecated in favour of cast_to_struct/2, which is the same, but more clearly named"
   def to_struct(data = %{__struct__: _}, schema), do: Map.from_struct(data) |> to_struct(schema)
   def to_struct(data, schema), do: generate_changeset(data, schema) |> into_struct()
 
@@ -86,6 +87,9 @@ defmodule EctoMorph do
   We filter out any keys that are not defined in the schema, and if the first argument is a struct,
   we call Map.from_struct/1 on it first. This can be useful for converting data between structs.
   """
+  @spec to_struct(map | ecto_struct, schema_module, list) :: okay_struct | error_changeset
+  @since "0.1.11"
+  @deprecated "to_struct/3 has been deprecated in favour of cast_to_struct/3, which is the same, but more clearly named"
   def to_struct(data = %{__struct__: _}, schema, fields) do
     Map.from_struct(data) |> to_struct(schema, fields)
   end
@@ -93,6 +97,119 @@ defmodule EctoMorph do
   def to_struct(data, schema, fields) do
     generate_changeset(data, schema, fields)
     |> into_struct
+  end
+
+  @doc """
+  Takes some data and tries to convert it to a struct in the shape of the given schema. Casts values
+  to the types defined by the schema dynamically using ecto changesets.
+
+  Consider this:
+
+      iex> Jason.encode!(%{a: :b, c: Decimal.new("10")}) |> Jason.decode!
+      %{"a" => "b", "c" => "10"}
+
+  When we decode some JSON (e.g. from a jsonb column in the db or from a network request), the JSON gets
+  `decode`d by our Jason lib, but not all of the information is preserved; any atom keys become strings,
+  and if the value is a type that is not part of the JSON spec, it is casted to a string.
+
+  This means we cannot pass that JSON data directly into a struct/2 function and expect a shiny
+  Ecto struct back (struct!/2 will just raise, and struct/2 will silently return an empty struct)
+
+  UNTIL NOW!
+
+  Here we take care of casting the values in the json to the type that the given schema defines, as
+  well as turning the string keys into (existing) atoms. (We know they will be existing atoms
+  because they will exist in the schema definitions.)
+
+  We filter out any keys that are not defined in the schema, and if the first argument is a struct,
+  we call Map.from_struct/1 on it first. This can be useful for converting data between structs.
+
+  Check out the tests for more full examples.
+
+  ### Examples
+
+      iex> defmodule Test do
+      ...>   use Ecto.Schema
+      ...>
+      ...>   embedded_schema do
+      ...>     field(:pageviews, :integer)
+      ...>   end
+      ...> end
+      ...> {:ok, test = %Test{}} = cast_to_struct(%{"pageviews" => "10"}, Test)
+      ...> test.pageviews
+      10
+
+      iex> defmodule Test do
+      ...>   use Ecto.Schema
+      ...>
+      ...>   embedded_schema do
+      ...>     field(:pageviews, :integer)
+      ...>   end
+      ...> end
+      ...> json = %{"pageviews" => "10", "ignored_field" => "ten"}
+      ...> {:ok, test = %Test{}} = cast_to_struct(json, Test)
+      ...> test.pageviews
+      10
+  """
+  # This should probably be called `cast_to_struct` to show what it does
+  @spec cast_to_struct(map | ecto_struct, schema_module) :: okay_struct | error_changeset
+  @spec cast_to_struct(map | ecto_struct, schema_module, list) :: okay_struct | error_changeset
+  def cast_to_struct(data = %{__struct__: _}, schema) do
+    Map.from_struct(data) |> cast_to_struct(schema)
+  end
+
+  def cast_to_struct(data, schema), do: generate_changeset(data, schema) |> into_struct()
+
+  @doc """
+  Takes some data and tries to convert it to a struct in the shape of the given schema. Casts values
+  to the types defined by the schema dynamically using ecto changesets.
+
+  Accepts a whitelist of fields that you allow updates / inserts on. This list of fields can define
+  fields for inner schemas also like so:
+
+  ```elixir
+    EctoMorph.cast_to_struct(json, SchemaUnderTest, [
+      :boolean,
+      :name,
+      :binary,
+      :array_of_ints,
+      steamed_hams: [:pickles, double_nested_schema: [:value]]
+    ])
+  ```
+
+  We filter out any keys that are not defined in the schema, and if the first argument is a struct,
+  we call Map.from_struct/1 on it first. This can be useful for converting data between structs.
+  """
+  def cast_to_struct(data = %{__struct__: _}, schema, fields) do
+    Map.from_struct(data) |> cast_to_struct(schema, fields)
+  end
+
+  def cast_to_struct(data, schema, fields) do
+    generate_changeset(data, schema, fields)
+    |> into_struct
+  end
+
+  @doc """
+  Attempts to update the given Ecto Schema struct with the given data by casting data and merging
+  it into the struct. Uses `cast` and changesets to recursively update any nested relations also.
+
+  Accepts a whitelist of fields for which updates can take place on. The whitelist can be arbitrarily
+  nested, and Data may be a map, or another struct of any kind. See examples below.
+
+  ### Examples
+
+      iex> MyApp.Repo.get(Thing, 10) |> EctoMorph.update
+
+  As with cast_to_struct, the data you are updating struct you are updating can be a
+  """
+  @spec update_struct(ecto_struct, map()) :: okay_struct | error_changeset
+  @spec update_struct(ecto_struct, map(), list) :: okay_struct | error_changeset
+  def update_struct(struct_to_update = %{__struct__: _}, data) do
+    cast_to_struct(data, struct_to_update)
+  end
+
+  def update_struct(struct_to_update = %{__struct__: _}, data, field_whitelist) do
+    cast_to_struct(data, struct_to_update, field_whitelist)
   end
 
   @doc """
@@ -117,7 +234,7 @@ defmodule EctoMorph do
       ...>
   ```
   """
-  @spec generate_changeset(map() | ecto_struct, ecto_schema_module | ecto_struct) ::
+  @spec generate_changeset(map() | ecto_struct, schema_module | ecto_struct) ::
           Ecto.Changeset.t()
   def generate_changeset(data = %{__struct__: _}, schema) do
     generate_changeset(Map.from_struct(data), schema)
@@ -187,8 +304,7 @@ defmodule EctoMorph do
       ...> ])
   ```
   """
-  @spec generate_changeset(map() | ecto_struct, ecto_schema_module | ecto_struct, list) ::
-          Ecto.Changeset.t()
+  @spec generate_changeset(map(), schema_module | ecto_struct, list) :: Ecto.Changeset.t()
   def generate_changeset(data = %{__struct__: _}, schema_or_existing_struct, fields) do
     generate_changeset(Map.from_struct(data), schema_or_existing_struct, fields)
   end
@@ -208,7 +324,7 @@ defmodule EctoMorph do
   end
 
   @doc "Returns a map of all of the schema fields contained within data"
-  @spec filter_by_schema_fields(map(), ecto_schema_module) :: map()
+  @spec filter_by_schema_fields(map(), schema_module) :: map()
   def filter_by_schema_fields(data, schema) do
     Map.take(data, schema.__schema__(:fields))
   end
@@ -217,7 +333,7 @@ defmodule EctoMorph do
   Take a changeset and returns a struct if there are no errors on the changeset. Returns an error
   tuple with the invalid changeset otherwise.
   """
-  @spec into_struct(Ecto.Changeset.t()) :: {:ok, ecto_struct} | {:error, Ecto.Changeset.t()}
+  @spec into_struct(Ecto.Changeset.t()) :: okay_struct | error_changeset
   def into_struct(changeset = %{valid?: true}), do: {:ok, Ecto.Changeset.apply_changes(changeset)}
   def into_struct(changeset), do: {:error, changeset}
 
@@ -288,6 +404,8 @@ defmodule EctoMorph do
     end)
   end
 
+  # Do We need to handle assocs here too,... test it plz in nest_db
+  # Also add the ability to query for all parents (and children?) in the tree?
   defp embedded_schema_fields(schema) do
     Enum.filter(schema.__schema__(:fields), fn field ->
       with {:embed, _} <- schema.__schema__(:type, field) do
