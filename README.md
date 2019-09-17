@@ -28,7 +28,7 @@ Ecto.Changeset.cast(%Test{}, %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, [
 Now we can do this:
 
 ```elixir
-EctoMorph.to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test)
+EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test)
 ```
 
 Or something like this:
@@ -36,15 +36,26 @@ Or something like this:
 ```elixir
 with {:ok, %{status: 200, body: body}} <- HTTPoison.get("mygreatapi.co.uk") do
   Jason.decode!(body)
-  |> EctoMorph.to_struct(User)
+  |> EctoMorph.cast_to_struct(User)
 end
 ```
 
 We can also whitelist fields to cast / update:
 
 ```elixir
-EctoMorph.to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing])
-EctoMorph.to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing, embed: [:bar]])
+EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing])
+EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing, embed: [:bar]])
+```
+
+Sometimes it makes sense to update a struct we have retrieved from the database with data from our response. We can do that like so:
+
+```elixir
+def update(data) do
+  # This will update the db struct with the data passed in, then update the db.
+  MyRepo.get!(MySchema, 10)
+  |> EctoMorph.update_struct(data)
+  |> MyRepo.update!()
+end
 ```
 
 Other abilities include creating a map from an ecto struct, dropping optional fields if you decide to:
