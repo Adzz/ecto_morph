@@ -62,13 +62,13 @@ Other abilities include creating a map from an ecto struct, dropping optional fi
 
 ```elixir
 EctoMorph.map_from_struct(%Test{})
-%Test{foo: "bar", updated_at: ~N[2000-01-01 23:00:07], inserted_at: ~N[2000-01-01 23:00:07], id: 10}
+%{foo: "bar", updated_at: ~N[2000-01-01 23:00:07], inserted_at: ~N[2000-01-01 23:00:07], id: 10}
 
 EctoMorph.map_from_struct(%Test{}, [:exclude_timestamps])
-%Test{foo: "bar", id: 10}
+%{foo: "bar", id: 10}
 
 EctoMorph.map_from_struct(%Test{}, [:exclude_timestamps, :exclude_id])
-%Test{foo: "bar"}
+%{foo: "bar"}
 ```
 
 and being able to filter some data by the fields in the given schema:
