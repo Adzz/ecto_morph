@@ -62,7 +62,6 @@ defmodule EctoMorph do
   """
   # This should probably be called `cast_to_struct` to show what it does
   @spec to_struct(map | ecto_struct, schema_module) :: okay_struct | error_changeset
-  @since "0.1.11"
   @deprecated "to_struct/2 has been deprecated in favour of cast_to_struct/2, which is the same, but more clearly named"
   def to_struct(data = %{__struct__: _}, schema), do: Map.from_struct(data) |> to_struct(schema)
   def to_struct(data, schema), do: generate_changeset(data, schema) |> into_struct()
@@ -243,7 +242,7 @@ defmodule EctoMorph do
   def generate_changeset(data, current = %{__struct__: schema}) do
     with [] <- embedded_schema_fields(schema) do
       current
-      |> Ecto.Changeset.cast(data, schema.__schema__(:fields))
+      |> Ecto.Changeset.cast(data, schema_fields(schema))
     else
       embedded_fields ->
         current
@@ -256,7 +255,7 @@ defmodule EctoMorph do
     with [] <- embedded_schema_fields(schema) do
       schema
       |> struct(%{})
-      |> Ecto.Changeset.cast(data, schema.__schema__(:fields))
+      |> Ecto.Changeset.cast(data, schema_fields(schema))
     else
       embedded_fields ->
         schema
@@ -326,7 +325,7 @@ defmodule EctoMorph do
   @doc "Returns a map of all of the schema fields contained within data"
   @spec filter_by_schema_fields(map(), schema_module) :: map()
   def filter_by_schema_fields(data, schema) do
-    Map.take(data, schema.__schema__(:fields))
+    Map.take(data, schema_fields(schema))
   end
 
   @doc """
@@ -404,20 +403,16 @@ defmodule EctoMorph do
     end)
   end
 
-  # Do We need to handle assocs here too,... test it plz in nest_db
-  # Also add the ability to query for all parents (and children?) in the tree?
   defp embedded_schema_fields(schema) do
-    Enum.filter(schema.__schema__(:fields), fn field ->
-      with {:embed, _} <- schema.__schema__(:type, field) do
-        true
-      else
-        _ -> false
-      end
-    end)
+    schema.__schema__(:embeds)
+  end
+
+  defp schema_fields(schema) do
+    schema.__schema__(:fields)
   end
 
   defp non_embedded_schema_fields(schema) do
-    Enum.filter(schema.__schema__(:fields), fn field ->
+    Enum.filter(schema_fields(schema), fn field ->
       with {:embed, _} <- schema.__schema__(:type, field) do
         false
       else
