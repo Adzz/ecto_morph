@@ -150,7 +150,6 @@ defmodule EctoMorph do
       ...> test.pageviews
       10
   """
-  # This should probably be called `cast_to_struct` to show what it does
   @spec cast_to_struct(map | ecto_struct, schema_module) :: okay_struct | error_changeset
   @spec cast_to_struct(map | ecto_struct, schema_module, list) :: okay_struct | error_changeset
   def cast_to_struct(data = %{__struct__: _}, schema) do
@@ -240,14 +239,20 @@ defmodule EctoMorph do
   end
 
   def generate_changeset(data, current = %{__struct__: schema}) do
-    with [] <- embedded_schema_fields(schema) do
-      current
-      |> Ecto.Changeset.cast(data, schema_fields(schema))
-    else
-      embedded_fields ->
-        current
-        |> Ecto.Changeset.cast(data, non_embedded_schema_fields(schema))
-        |> cast_all_the_embeds(embedded_fields)
+    # check for assocs here too ?
+    # schema.__schema__(:associations)
+    case {embedded_schema_fields(schema), schema_associations(schema)} do
+      {[], []} ->
+        cast(current, data, schema)
+
+      {[], assocs} ->
+        cast(current, data, schema) |> cast_assocs(assocs)
+
+      {embeds, []} ->
+        cast(current, data, schema) |> cast_all_the_embeds(embeds)
+
+      {embeds, assocs} ->
+        cast(current, data, schema) |> cast_assocs(assocs) |> cast_all_the_embeds(embeds)
     end
   end
 
@@ -255,7 +260,7 @@ defmodule EctoMorph do
     with [] <- embedded_schema_fields(schema) do
       schema
       |> struct(%{})
-      |> Ecto.Changeset.cast(data, schema_fields(schema))
+      |> Ecto.Changeset.cast(data, non_embedded_schema_fields(schema))
     else
       embedded_fields ->
         schema
@@ -318,6 +323,8 @@ defmodule EctoMorph do
         schema_or_existing_struct
         |> struct!(%{})
         |> Ecto.Changeset.cast(data, non_embedded_allowed_fields(fields))
+        # should this be non embeddded allowed fields, are we testing for
+        # disallowed embedded fields, looks like not.....
         |> cast_embeded_fields(embedded_fields)
     end
   end
@@ -369,6 +376,16 @@ defmodule EctoMorph do
     |> Map.drop(fields_to_drop)
   end
 
+  def with_rollback() do
+    # Inspired by the chat in the email thread, can we solve the problem of side effects being
+    # tied to db transactions. If one doesn't happen, we want to roll both back. To do that, we
+    # can allow a function to act as the rollback function (a la the saga pattern?)
+    # That allows semantic undoing? But what if the rollback fails...
+
+    # Not sure if with rollback is the way? a V. general.
+  end
+
+  # add one for cast_assoc
   defp cast_embeded_fields(changeset, embedded_fields) do
     Enum.reduce(embedded_fields, changeset, fn {embedded_field, fields}, changeset ->
       Ecto.Changeset.cast_embed(changeset, embedded_field,
@@ -382,6 +399,18 @@ defmodule EctoMorph do
   defp cast_all_the_embeds(changeset, embedded_fields) do
     Enum.reduce(embedded_fields, changeset, fn embedded_field, changeset ->
       Ecto.Changeset.cast_embed(changeset, embedded_field,
+        with: fn struct, changes -> generate_changeset(changes, struct.__struct__) end
+      )
+    end)
+  end
+
+  defp cast(current, data, schema) do
+    Ecto.Changeset.cast(current, data, non_embedded_schema_fields(schema))
+  end
+
+  defp cast_assocs(changeset, assocs) do
+    Enum.reduce(assocs, changeset, fn assoc, changeset_acc ->
+      Ecto.Changeset.cast_assoc(changeset_acc, assoc,
         with: fn struct, changes -> generate_changeset(changes, struct.__struct__) end
       )
     end)
@@ -409,6 +438,10 @@ defmodule EctoMorph do
 
   defp schema_fields(schema) do
     schema.__schema__(:fields)
+  end
+
+  defp schema_associations(schema) do
+    schema.__schema__(:associations)
   end
 
   defp non_embedded_schema_fields(schema) do

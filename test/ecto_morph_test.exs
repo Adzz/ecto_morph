@@ -15,6 +15,12 @@ defmodule EctoMorphTest do
 
     @impl true
     def load(_), do: raise("This will never be called")
+
+    @impl true
+    def equal?(_, _), do: true
+
+    @impl true
+    def embed_as(_), do: :self
   end
 
   defmodule SchemaWithTimestamps do
@@ -86,6 +92,33 @@ defmodule EctoMorphTest do
 
   defmodule NonEctoStruct do
     defstruct [:integer]
+  end
+
+  defmodule HasMany do
+    use Ecto.Schema
+
+    schema "newest_table" do
+      field(:geese_to_feed, :integer)
+    end
+  end
+
+  defmodule HasOne do
+    use Ecto.Schema
+
+    schema "other_table" do
+      field(:hen_to_eat, :integer)
+    end
+  end
+
+  defmodule TableBackedSchema do
+    use Ecto.Schema
+
+    schema "test_table" do
+      field(:thing, :string)
+      embeds_one(:aurora_borealis, AuroraBorealis)
+      has_one(:has_one, HasOne)
+      has_many(:has_many, HasMany)
+    end
   end
 
   setup do
@@ -816,6 +849,61 @@ defmodule EctoMorphTest do
       refute steamed_ham.valid?
       assert steamed_ham.errors == [pickles: {"is invalid", [type: :integer, validation: :cast]}]
       assert changes.aurora_borealis.valid?
+    end
+
+    test "Successfully creates a changeset for assocs" do
+      json = %{
+        "thing" => "lively",
+        "has_one" => %{"hen_to_eat" => 0},
+        "has_many" => [%{"geese_to_feed" => 10}],
+        "aurora_borealis" => %{
+          "location" => "Kitchen",
+          "probability" => "0.001",
+          "actually_a_fire?" => false
+        }
+      }
+
+      assert %Ecto.Changeset{
+               valid?: true,
+               errors: [],
+               data: %TableBackedSchema{},
+               changes: %{
+                 thing: "lively",
+                 has_one: associated_changeset,
+                 has_many: [many_changeset],
+                 aurora_borealis: aurora_borealis
+               }
+             } = EctoMorph.generate_changeset(json, %TableBackedSchema{})
+
+      assert %Ecto.Changeset{
+               valid?: true,
+               errors: [],
+               data: %HasOne{}
+             } = associated_changeset
+
+      assert %Ecto.Changeset{
+               valid?: true,
+               errors: [],
+               data: %HasMany{}
+             } = many_changeset
+
+      assert %Ecto.Changeset{
+               valid?: true,
+               errors: [],
+               data: %AuroraBorealis{}
+             } = aurora_borealis
+
+      assert associated_changeset.changes == %{hen_to_eat: 0}
+      assert many_changeset.changes == %{geese_to_feed: 10}
+
+      assert aurora_borealis.changes == %{
+               actually_a_fire?: false,
+               location: "Kitchen",
+               probability: Decimal.new("0.001")
+             }
+    end
+
+    test "creates changesets for both embeds and assocs" do
     end
 
     test "Accepts a struct as the first argument" do
