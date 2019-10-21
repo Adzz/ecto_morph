@@ -15,6 +15,12 @@ defmodule EctoMorphTest do
 
     @impl true
     def load(_), do: raise("This will never be called")
+
+    @impl true
+    def equal?(_, _), do: true
+
+    @impl true
+    def embed_as(_), do: :self
   end
 
   defmodule SchemaWithTimestamps do
@@ -88,6 +94,33 @@ defmodule EctoMorphTest do
     defstruct [:integer]
   end
 
+  defmodule HasMany do
+    use Ecto.Schema
+
+    schema "newest_table" do
+      field(:geese_to_feed, :integer)
+    end
+  end
+
+  defmodule HasOne do
+    use Ecto.Schema
+
+    schema "other_table" do
+      field(:hen_to_eat, :integer)
+    end
+  end
+
+  defmodule TableBackedSchema do
+    use Ecto.Schema
+
+    schema "test_table" do
+      field(:thing, :string)
+      embeds_one(:aurora_borealis, AuroraBorealis)
+      has_one(:has_one, HasOne)
+      has_many(:has_many, HasMany)
+    end
+  end
+
   setup do
     %{
       json: %{
@@ -125,211 +158,6 @@ defmodule EctoMorphTest do
         "field_to_ignore" => "ensures we just ignore fields that are not part of the schema"
       }
     }
-  end
-
-  describe "to_struct/2" do
-    test "Converts the decoded JSON into a struct of the provided schema, casting the values appropriately",
-         %{json: json} do
-      {:ok, schema_under_test = %SchemaUnderTest{}} = EctoMorph.to_struct(json, SchemaUnderTest)
-
-      assert schema_under_test.binary_id == "this_is_a_binary_id"
-      assert schema_under_test.integer == 77
-      assert schema_under_test.float == 1.7
-      assert schema_under_test.boolean == false
-      assert schema_under_test.name == "Super Nintendo Chalmers"
-      assert schema_under_test.binary == "It's a regional dialect"
-      assert schema_under_test.array_of_ints == [1, 2, 3, 4]
-      assert schema_under_test.map == %{"on_fire" => true, "Seymour!" => "The house is on fire"}
-      assert schema_under_test.map_of_integers == %{"one" => 1, "two" => 2}
-      assert schema_under_test.percentage == Decimal.new("2.5")
-      assert schema_under_test.date == ~D[2018-05-05]
-      assert schema_under_test.time == ~T[10:30:01]
-      assert schema_under_test.naive_datetime == ~N[2000-02-29 00:00:00]
-      assert schema_under_test.naive_datetime_usec == ~N[2000-02-29 00:00:00.000000]
-      assert schema_under_test.utc_datetime |> DateTime.to_string() == "2019-04-08 14:31:14Z"
-
-      assert schema_under_test.utc_datetime_usec |> DateTime.to_string() ==
-               "2019-04-08 14:31:14.366732Z"
-
-      assert schema_under_test.aurora_borealis == %AuroraBorealis{
-               location: "Kitchen",
-               probability: Decimal.new("0.001"),
-               actually_a_fire?: false
-             }
-
-      assert schema_under_test.steamed_hams == [
-               %SteamedHams{
-                 meat_type: "beef",
-                 pickles: 2,
-                 sauce_ratio: Decimal.new("0.5"),
-                 double_nested_schema: nil
-               },
-               %SteamedHams{
-                 meat_type: "chicken",
-                 pickles: 1,
-                 sauce_ratio: Decimal.new("0.7"),
-                 double_nested_schema: %DoubleNestedSchema{value: "works!"}
-               }
-             ]
-    end
-
-    test "Allows structs as the map of data, simply calling Map.from_struct on it first" do
-      {:ok, result} = EctoMorph.to_struct(%SchemaUnderTest{integer: 1}, SchemaUnderTest)
-      assert result.integer == 1
-
-      {:ok, result} = EctoMorph.to_struct(%NonEctoStruct{integer: 1}, SchemaUnderTest)
-      assert result.integer == 1
-    end
-
-    test "Allows schema to be a struct, simply updating it if so" do
-      struct_to_update = %SchemaUnderTest{integer: 2, binary: "yis"}
-
-      {:ok, result} = EctoMorph.to_struct(%{integer: 1}, struct_to_update)
-
-      assert result.integer == 1
-      assert result.binary == "yis"
-
-      {:ok, result} = EctoMorph.to_struct(%{integer: 1}, struct_to_update)
-      assert result.integer == 1
-      assert result.binary == "yis"
-    end
-
-    test "returns an invalid changeset when an embeds_many embed is invalid" do
-      json = %{
-        "steamed_hams" => [
-          %{"meat_type" => "beef", "pickles" => false, "sauce_ratio" => "0.5"}
-        ],
-        "aurora_borealis" => %{
-          "location" => "Kitchen",
-          "probability" => "0.001",
-          "actually_a_fire?" => false
-        },
-        "field_to_ignore" => "ensures we just ignore fields that are not part of the schema"
-      }
-
-      {:error,
-       %Ecto.Changeset{
-         valid?: false,
-         errors: [],
-         data: %SchemaUnderTest{},
-         changes: changes
-       }} = EctoMorph.to_struct(json, SchemaUnderTest)
-
-      [steamed_ham] = changes.steamed_hams
-
-      refute steamed_ham.valid?
-      assert steamed_ham.errors == [pickles: {"is invalid", [type: :integer, validation: :cast]}]
-      assert changes.aurora_borealis.valid?
-    end
-
-    test "returns an invalid changeset when a embeds_one embed is invalid" do
-      json = %{
-        "steamed_hams" => [
-          %{"meat_type" => "beef", "pickles" => 2, "sauce_ratio" => "0.5"}
-        ],
-        "aurora_borealis" => %{
-          "location" => "Kitchen",
-          "probability" => "0.001",
-          "actually_a_fire?" => "YES"
-        },
-        "field_to_ignore" => "ensures we just ignore fields that are not part of the schema"
-      }
-
-      {:error,
-       %Ecto.Changeset{
-         valid?: false,
-         errors: [],
-         data: %SchemaUnderTest{},
-         changes: changes
-       }} = EctoMorph.to_struct(json, SchemaUnderTest)
-
-      refute changes.aurora_borealis.valid?
-
-      assert changes.aurora_borealis.errors == [
-               actually_a_fire?: {"is invalid", [type: :boolean, validation: :cast]}
-             ]
-
-      [steamed_ham] = changes.steamed_hams
-      assert steamed_ham.valid?
-    end
-
-    test "Allows us to specify a subset of fields", %{json: json} do
-      {:ok, schema_under_test = %SchemaUnderTest{}} =
-        EctoMorph.to_struct(json, SchemaUnderTest, [
-          :boolean,
-          :name,
-          :binary,
-          :array_of_ints,
-          steamed_hams: [:pickles, double_nested_schema: [:value]]
-        ])
-
-      assert schema_under_test.boolean == false
-      assert schema_under_test.name == "Super Nintendo Chalmers"
-      assert schema_under_test.binary == "It's a regional dialect"
-      assert schema_under_test.array_of_ints == [1, 2, 3, 4]
-
-      assert schema_under_test.steamed_hams == [
-               %EctoMorphTest.SteamedHams{
-                 double_nested_schema: nil,
-                 id: nil,
-                 meat_type: nil,
-                 pickles: 2,
-                 sauce_ratio: nil
-               },
-               %EctoMorphTest.SteamedHams{
-                 double_nested_schema: %EctoMorphTest.DoubleNestedSchema{
-                   id: nil,
-                   value: "works!"
-                 },
-                 id: nil,
-                 meat_type: nil,
-                 pickles: 1,
-                 sauce_ratio: nil
-               }
-             ]
-    end
-
-    test "Allows the schema to be a struct whereby that struct will be updated - whitelisting fields",
-         %{
-           json: json
-         } do
-      {:ok, schema_under_test = %SchemaUnderTest{}} =
-        EctoMorph.to_struct(
-          json,
-          %SchemaUnderTest{binary: "test", name: "Super Nintendo Chalmers"},
-          [
-            :boolean,
-            :binary,
-            :array_of_ints,
-            steamed_hams: [:pickles, double_nested_schema: [:value]]
-          ]
-        )
-
-      assert schema_under_test.boolean == false
-      assert schema_under_test.name == "Super Nintendo Chalmers"
-      assert schema_under_test.binary == "It's a regional dialect"
-      assert schema_under_test.array_of_ints == [1, 2, 3, 4]
-
-      assert schema_under_test.steamed_hams == [
-               %EctoMorphTest.SteamedHams{
-                 double_nested_schema: nil,
-                 id: nil,
-                 meat_type: nil,
-                 pickles: 2,
-                 sauce_ratio: nil
-               },
-               %EctoMorphTest.SteamedHams{
-                 double_nested_schema: %EctoMorphTest.DoubleNestedSchema{
-                   id: nil,
-                   value: "works!"
-                 },
-                 id: nil,
-                 meat_type: nil,
-                 pickles: 1,
-                 sauce_ratio: nil
-               }
-             ]
-    end
   end
 
   describe "cast_to_struct/2" do
@@ -818,6 +646,61 @@ defmodule EctoMorphTest do
       assert changes.aurora_borealis.valid?
     end
 
+    test "Successfully creates a changeset for assocs" do
+      json = %{
+        "thing" => "lively",
+        "has_one" => %{"hen_to_eat" => 0},
+        "has_many" => [%{"geese_to_feed" => 10}],
+        "aurora_borealis" => %{
+          "location" => "Kitchen",
+          "probability" => "0.001",
+          "actually_a_fire?" => false
+        }
+      }
+
+      assert %Ecto.Changeset{
+               valid?: true,
+               errors: [],
+               data: %TableBackedSchema{},
+               changes: %{
+                 thing: "lively",
+                 has_one: associated_changeset,
+                 has_many: [many_changeset],
+                 aurora_borealis: aurora_borealis
+               }
+             } = EctoMorph.generate_changeset(json, %TableBackedSchema{})
+
+      assert %Ecto.Changeset{
+               valid?: true,
+               errors: [],
+               data: %HasOne{}
+             } = associated_changeset
+
+      assert %Ecto.Changeset{
+               valid?: true,
+               errors: [],
+               data: %HasMany{}
+             } = many_changeset
+
+      assert %Ecto.Changeset{
+               valid?: true,
+               errors: [],
+               data: %AuroraBorealis{}
+             } = aurora_borealis
+
+      assert associated_changeset.changes == %{hen_to_eat: 0}
+      assert many_changeset.changes == %{geese_to_feed: 10}
+
+      assert aurora_borealis.changes == %{
+               actually_a_fire?: false,
+               location: "Kitchen",
+               probability: Decimal.new("0.001")
+             }
+    end
+
+    test "creates changesets for both embeds and assocs" do
+    end
+
     test "Accepts a struct as the first argument" do
       changeset = EctoMorph.generate_changeset(%NonEctoStruct{integer: 1}, SchemaUnderTest)
       assert changeset.valid?
@@ -935,7 +818,8 @@ defmodule EctoMorphTest do
       |> EctoMorph.generate_changeset(SchemaUnderTest)
       |> EctoMorph.into_struct()
 
-      {:ok, schema_under_test = %SchemaUnderTest{}} = EctoMorph.to_struct(json, SchemaUnderTest)
+      {:ok, schema_under_test = %SchemaUnderTest{}} =
+        EctoMorph.cast_to_struct(json, SchemaUnderTest)
 
       assert schema_under_test.binary_id == "this_is_a_binary_id"
       assert schema_under_test.integer == 77
@@ -1020,6 +904,60 @@ defmodule EctoMorphTest do
                %{
                  foo: nil
                }
+    end
+
+    test "an option that doesn't exist" do
+      assert EctoMorph.map_from_struct(%SchemaWithTimestamps{}, [:banana, :exclude_timestamps]) ==
+               %{
+                 foo: nil,
+                 id: nil
+               }
+    end
+  end
+
+  describe "filter_by_schema_fields/2" do
+    test "returns all the fields in data that are schema fields" do
+      data = %{not_in_the_schema: "1", location: 1, probability: 1, actually_a_fire: 1}
+
+      assert EctoMorph.filter_by_schema_fields(data, AuroraBorealis) == %{
+               location: 1,
+               probability: 1
+             }
+    end
+
+    test "includes assocs" do
+      data = %{
+        not_in_the_schema: "1",
+        has_one: %{hen_to_eat: 1}
+      }
+
+      assert EctoMorph.filter_by_schema_fields(data, TableBackedSchema, [:include_assocs]) == %{
+               has_one: %{hen_to_eat: 1}
+             }
+    end
+
+    test "includes embeds" do
+      data = %{
+        not_in_the_schema: "1",
+        aurora_borealis: %{location: 1}
+      }
+
+      assert EctoMorph.filter_by_schema_fields(data, TableBackedSchema, [:include_embeds]) == %{
+               aurora_borealis: %{location: 1}
+             }
+    end
+
+    test "includes embeds and assocs" do
+      data = %{
+        not_in_the_schema: "1",
+        has_one: %{hen_to_eat: 1},
+        aurora_borealis: %{location: 1}
+      }
+
+      assert EctoMorph.filter_by_schema_fields(data, TableBackedSchema, [
+               :include_assocs,
+               :include_embeds
+             ]) == %{aurora_borealis: %{location: 1}, has_one: %{hen_to_eat: 1}}
     end
   end
 end

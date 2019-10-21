@@ -44,96 +44,6 @@ defmodule EctoMorph do
       ...>     field(:pageviews, :integer)
       ...>   end
       ...> end
-      ...> {:ok, test = %Test{}} = to_struct(%{"pageviews" => "10"}, Test)
-      ...> test.pageviews
-      10
-
-      iex> defmodule Test do
-      ...>   use Ecto.Schema
-      ...>
-      ...>   embedded_schema do
-      ...>     field(:pageviews, :integer)
-      ...>   end
-      ...> end
-      ...> json = %{"pageviews" => "10", "ignored_field" => "ten"}
-      ...> {:ok, test = %Test{}} = to_struct(json, Test)
-      ...> test.pageviews
-      10
-  """
-  # This should probably be called `cast_to_struct` to show what it does
-  @spec to_struct(map | ecto_struct, schema_module) :: okay_struct | error_changeset
-  @deprecated "to_struct/2 has been deprecated in favour of cast_to_struct/2, which is the same, but more clearly named"
-  def to_struct(data = %{__struct__: _}, schema), do: Map.from_struct(data) |> to_struct(schema)
-  def to_struct(data, schema), do: generate_changeset(data, schema) |> into_struct()
-
-  @doc """
-  Takes some data and tries to convert it to a struct in the shape of the given schema. Casts values
-  to the types defined by the schema dynamically using ecto changesets.
-
-  Accepts a whitelist of fields that you allow updates / inserts on. This list of fields can define
-  fields for inner schemas also like so:
-
-  ```elixir
-    EctoMorph.to_struct(json, SchemaUnderTest, [
-      :boolean,
-      :name,
-      :binary,
-      :array_of_ints,
-      steamed_hams: [:pickles, double_nested_schema: [:value]]
-    ])
-  ```
-
-  We filter out any keys that are not defined in the schema, and if the first argument is a struct,
-  we call Map.from_struct/1 on it first. This can be useful for converting data between structs.
-  """
-  @spec to_struct(map | ecto_struct, schema_module, list) :: okay_struct | error_changeset
-  @since "0.1.11"
-  @deprecated "to_struct/3 has been deprecated in favour of cast_to_struct/3, which is the same, but more clearly named"
-  def to_struct(data = %{__struct__: _}, schema, fields) do
-    Map.from_struct(data) |> to_struct(schema, fields)
-  end
-
-  def to_struct(data, schema, fields) do
-    generate_changeset(data, schema, fields)
-    |> into_struct
-  end
-
-  @doc """
-  Takes some data and tries to convert it to a struct in the shape of the given schema. Casts values
-  to the types defined by the schema dynamically using ecto changesets.
-
-  Consider this:
-
-      iex> Jason.encode!(%{a: :b, c: Decimal.new("10")}) |> Jason.decode!
-      %{"a" => "b", "c" => "10"}
-
-  When we decode some JSON (e.g. from a jsonb column in the db or from a network request), the JSON gets
-  `decode`d by our Jason lib, but not all of the information is preserved; any atom keys become strings,
-  and if the value is a type that is not part of the JSON spec, it is casted to a string.
-
-  This means we cannot pass that JSON data directly into a struct/2 function and expect a shiny
-  Ecto struct back (struct!/2 will just raise, and struct/2 will silently return an empty struct)
-
-  UNTIL NOW!
-
-  Here we take care of casting the values in the json to the type that the given schema defines, as
-  well as turning the string keys into (existing) atoms. (We know they will be existing atoms
-  because they will exist in the schema definitions.)
-
-  We filter out any keys that are not defined in the schema, and if the first argument is a struct,
-  we call Map.from_struct/1 on it first. This can be useful for converting data between structs.
-
-  Check out the tests for more full examples.
-
-  ### Examples
-
-      iex> defmodule Test do
-      ...>   use Ecto.Schema
-      ...>
-      ...>   embedded_schema do
-      ...>     field(:pageviews, :integer)
-      ...>   end
-      ...> end
       ...> {:ok, test = %Test{}} = cast_to_struct(%{"pageviews" => "10"}, Test)
       ...> test.pageviews
       10
@@ -150,7 +60,6 @@ defmodule EctoMorph do
       ...> test.pageviews
       10
   """
-  # This should probably be called `cast_to_struct` to show what it does
   @spec cast_to_struct(map | ecto_struct, schema_module) :: okay_struct | error_changeset
   @spec cast_to_struct(map | ecto_struct, schema_module, list) :: okay_struct | error_changeset
   def cast_to_struct(data = %{__struct__: _}, schema) do
@@ -233,37 +142,20 @@ defmodule EctoMorph do
       ...>
   ```
   """
-  @spec generate_changeset(map() | ecto_struct, schema_module | ecto_struct) ::
-          Ecto.Changeset.t()
+  @spec generate_changeset(map() | ecto_struct, schema_module | ecto_struct) :: Ecto.Changeset.t()
   def generate_changeset(data = %{__struct__: _}, schema) do
     generate_changeset(Map.from_struct(data), schema)
   end
 
   def generate_changeset(data, current = %{__struct__: schema}) do
-    with [] <- embedded_schema_fields(schema) do
-      current
-      |> Ecto.Changeset.cast(data, schema_fields(schema))
-    else
-      embedded_fields ->
-        current
-        |> Ecto.Changeset.cast(data, non_embedded_schema_fields(schema))
-        |> cast_all_the_embeds(embedded_fields)
-    end
+    generate_changeset(
+      data,
+      current,
+      schema_fields(schema) ++ schema_embeds(schema) ++ schema_associations(schema)
+    )
   end
 
-  def generate_changeset(data, schema) do
-    with [] <- embedded_schema_fields(schema) do
-      schema
-      |> struct(%{})
-      |> Ecto.Changeset.cast(data, schema_fields(schema))
-    else
-      embedded_fields ->
-        schema
-        |> struct(%{})
-        |> Ecto.Changeset.cast(data, non_embedded_schema_fields(schema))
-        |> cast_all_the_embeds(embedded_fields)
-    end
-  end
+  def generate_changeset(data, schema), do: generate_changeset(data, struct(schema, %{}))
 
   @doc """
   Takes in a map of data and creates a changeset out of it by casting the data recursively, according
@@ -308,24 +200,94 @@ defmodule EctoMorph do
     generate_changeset(Map.from_struct(data), schema_or_existing_struct, fields)
   end
 
-  def generate_changeset(data, schema_or_existing_struct, fields) do
-    with [] <- embedded_allowed_fields(fields) do
-      schema_or_existing_struct
-      |> struct!(%{})
-      |> Ecto.Changeset.cast(data, fields)
-    else
-      embedded_fields ->
-        schema_or_existing_struct
-        |> struct!(%{})
-        |> Ecto.Changeset.cast(data, non_embedded_allowed_fields(fields))
-        |> cast_embeded_fields(embedded_fields)
+  def generate_changeset(data, current = %{__struct__: schema}, fields) do
+    embedded_field_whitelist =
+      Enum.filter(fields, fn
+        {field, _} -> field in schema_embeds(schema)
+        field -> field in schema_embeds(schema)
+      end)
+
+    assoc_field_whitelist =
+      Enum.filter(fields, fn
+        {field, _} -> field in schema_associations(schema)
+        field -> field in schema_associations(schema)
+      end)
+
+    regular_field_whitelist =
+      Enum.filter(fields, fn field -> field in schema_fields(schema) end)
+      |> Enum.reject(fn field -> field in (assoc_field_whitelist ++ embedded_field_whitelist) end)
+
+    # We only want to cast assocs / embeds if data contains fields that are embeds or assocs.
+    # The data could very well have string keys though, but the result of schema_embeds and schema_associations
+    # is a map of Atoms. We shouldn't use String.to_atom on data for obvious reasons, so let's go
+    # the other way, and map schema_embeds to have string keys for the purpose of our check.
+    allowed_changes =
+      Enum.map(Map.keys(data), fn
+        key when is_atom(key) -> Atom.to_string(key)
+        key -> key
+      end)
+
+    making_embed_changes? =
+      Enum.any?(allowed_changes, fn
+        key ->
+          key in Enum.map(embedded_field_whitelist, fn
+            {field, _} -> Atom.to_string(field)
+            field -> Atom.to_string(field)
+          end)
+      end)
+
+    making_assoc_changes? =
+      Enum.any?(allowed_changes, fn key ->
+        key in Enum.map(assoc_field_whitelist, fn
+          {field, _} -> Atom.to_string(field)
+          field -> Atom.to_string(field)
+        end)
+      end)
+
+    case {making_embed_changes?, making_assoc_changes?} do
+      {false, false} ->
+        cast(current, data, regular_field_whitelist)
+
+      {false, true} ->
+        cast(current, data, regular_field_whitelist)
+        |> cast_assocs(assoc_field_whitelist)
+
+      {true, false} ->
+        cast(current, data, regular_field_whitelist)
+        |> cast_embeds(embedded_field_whitelist)
+
+      {true, true} ->
+        cast(current, data, regular_field_whitelist)
+        |> cast_assocs(assoc_field_whitelist)
+        |> cast_embeds(embedded_field_whitelist)
     end
   end
 
-  @doc "Returns a map of all of the schema fields contained within data"
-  @spec filter_by_schema_fields(map(), schema_module) :: map()
-  def filter_by_schema_fields(data, schema) do
-    Map.take(data, schema_fields(schema))
+  def generate_changeset(data, schema, fields) do
+    generate_changeset(data, struct(schema, %{}), fields)
+  end
+
+  @doc """
+  Returns a map of all of the schema fields contained within data, optionally includes associations
+  and embeds like so:
+
+      iex> filter_by_schema_fields(%{id: 1}, MySchema, [:include_assocs])
+      iex> filter_by_schema_fields(%{id: 2}, MySchema, [:include_embeds])
+      iex> filter_by_schema_fields(%{id: 3}, MySchema, [include_assocs, :include_embeds])
+  """
+  @spec filter_by_schema_fields(map(), schema_module, list()) :: map()
+  def filter_by_schema_fields(data, schema, options \\ []) do
+    options_mapping = %{
+      :include_assocs => schema_associations(schema),
+      :include_embeds => schema_embeds(schema)
+    }
+
+    fields =
+      Enum.reduce(options, schema_fields(schema), fn option, acc ->
+        acc ++ Map.get(options_mapping, option, [])
+      end)
+
+    Map.take(data, fields)
   end
 
   @doc """
@@ -356,54 +318,55 @@ defmodule EctoMorph do
   def map_from_struct(struct, options \\ []) do
     mapping = %{
       :exclude_timestamps => [:inserted_at, :updated_at],
-      :exclude_id => [:id],
-      nil => []
+      :exclude_id => [:id]
     }
 
     fields_to_drop =
       Enum.reduce(options, [:__meta__], fn option, acc ->
-        acc ++ Map.get(mapping, option, nil)
+        acc ++ Map.get(mapping, option, [])
       end)
 
     Map.from_struct(struct)
     |> Map.drop(fields_to_drop)
   end
 
-  defp cast_embeded_fields(changeset, embedded_fields) do
-    Enum.reduce(embedded_fields, changeset, fn {embedded_field, fields}, changeset ->
-      Ecto.Changeset.cast_embed(changeset, embedded_field,
-        with: fn struct, changes ->
-          generate_changeset(changes, struct.__struct__, fields)
-        end
-      )
+  defp cast_embeds(changeset, relations) do
+    Enum.reduce(relations, changeset, fn
+      {relation, fields}, changeset ->
+        Ecto.Changeset.cast_embed(changeset, relation,
+          with: fn struct, changes ->
+            generate_changeset(changes, struct, fields)
+          end
+        )
+
+      relation, changeset ->
+        Ecto.Changeset.cast_embed(changeset, relation,
+          with: fn struct, changes -> generate_changeset(changes, struct) end
+        )
     end)
   end
 
-  defp cast_all_the_embeds(changeset, embedded_fields) do
-    Enum.reduce(embedded_fields, changeset, fn embedded_field, changeset ->
-      Ecto.Changeset.cast_embed(changeset, embedded_field,
-        with: fn struct, changes -> generate_changeset(changes, struct.__struct__) end
-      )
+  defp cast_assocs(changeset, relations) do
+    Enum.reduce(relations, changeset, fn
+      {relation, fields}, changeset ->
+        Ecto.Changeset.cast_assoc(changeset, relation,
+          with: fn struct, changes ->
+            generate_changeset(changes, struct, fields)
+          end
+        )
+
+      relation, changeset ->
+        Ecto.Changeset.cast_assoc(changeset, relation,
+          with: fn struct, changes -> generate_changeset(changes, struct) end
+        )
     end)
   end
 
-  defp non_embedded_allowed_fields(fields) do
-    fields
-    |> Enum.filter(fn
-      {_embedded_field_name, _field} -> false
-      field when is_atom(field) -> true
-    end)
+  defp cast(current, data, fields) do
+    Ecto.Changeset.cast(current, data, fields)
   end
 
-  defp embedded_allowed_fields(fields) do
-    fields
-    |> Enum.filter(fn
-      {_embedded_field_name, _field} -> true
-      field when is_atom(field) -> false
-    end)
-  end
-
-  defp embedded_schema_fields(schema) do
+  defp schema_embeds(schema) do
     schema.__schema__(:embeds)
   end
 
@@ -411,13 +374,7 @@ defmodule EctoMorph do
     schema.__schema__(:fields)
   end
 
-  defp non_embedded_schema_fields(schema) do
-    Enum.filter(schema_fields(schema), fn field ->
-      with {:embed, _} <- schema.__schema__(:type, field) do
-        false
-      else
-        _ -> true
-      end
-    end)
+  defp schema_associations(schema) do
+    schema.__schema__(:associations)
   end
 end
