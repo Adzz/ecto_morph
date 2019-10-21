@@ -99,7 +99,7 @@ by adding `ecto_morph` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:ecto_morph, "~> 0.1.12"}
+    {:ecto_morph, "~> 0.1.13"}
   ]
 end
 ```
