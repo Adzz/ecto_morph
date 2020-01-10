@@ -327,6 +327,9 @@ defmodule EctoMorphTest do
          %{
            json: json
          } do
+      # TODO Check that the white listing can handle this case:
+      # [steamed_hams: :pickles]
+
       {:ok, schema_under_test = %SchemaUnderTest{}} =
         EctoMorph.cast_to_struct(
           json,
