@@ -47,6 +47,9 @@ defmodule EctoMorph.Validate do
   ```
 
   This is also completely backwards compatible with Ecto.
+
+  Could we instead use a list of Access paths?
+  EctoMorph.Validate.required([[:a, :b, :c], [:a, :b, :d]])
   """
 
   def change(changeset) do
