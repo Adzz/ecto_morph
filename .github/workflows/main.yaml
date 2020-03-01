@@ -6,4 +6,4 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: "run dem tests"
-      uses: Adzz/elixir_run_tests_action@v3-alpha
+      uses: Adzz/elixir_run_tests_action@v4-alpha
