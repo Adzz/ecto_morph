@@ -3,5 +3,5 @@ on: [push]
 jobs:
   run_tests:
     steps:
-      uses: adzz/elixir_run_tests_action
-
+    - name: "run dem tests"
+      uses: Adzz/elixir_run_tests_action@v2-alpha
