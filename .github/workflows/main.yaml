@@ -1,0 +1,7 @@
+on: [push]
+
+jobs:
+  run_tests:
+    steps:
+      uses: adzz/elixir_run_tests_action
+
