@@ -1,0 +1,9 @@
+on: [pull_request]
+
+jobs:
+  run_tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: "run dem tests"
+      uses: Adzz/elixir_run_tests_action@v4-alpha
