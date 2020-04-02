@@ -201,6 +201,8 @@ defmodule EctoMorph do
   end
 
   def generate_changeset(data, current = %{__struct__: schema}, fields) do
+    data = filter_not_loaded_relations(data)
+
     embedded_field_whitelist =
       Enum.filter(fields, fn
         {field, _} -> field in schema_embeds(schema)
@@ -265,6 +267,15 @@ defmodule EctoMorph do
 
   def generate_changeset(data, schema, fields) do
     generate_changeset(data, struct(schema, %{}), fields)
+  end
+
+  defp filter_not_loaded_relations(map = %{}) do
+    map
+    |> Enum.filter(fn
+      {_, %Ecto.Association.NotLoaded{}} -> false
+      _ -> true
+    end)
+    |> Enum.into(%{})
   end
 
   @doc """
