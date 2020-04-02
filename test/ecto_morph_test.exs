@@ -215,6 +215,47 @@ defmodule EctoMorphTest do
       assert result.integer == 1
     end
 
+    test "If the incoming changes are a struct, we filter out any unloaded changesets" do
+      {:ok, updated_struct} =
+        %TableBackedSchema{thing: "update"}
+        |> EctoMorph.cast_to_struct(TableBackedSchema)
+
+      assert updated_struct.thing == "update"
+
+      {:ok, updated_struct} =
+        %TableBackedSchema{thing: "update"}
+        |> EctoMorph.cast_to_struct(TableBackedSchema, [:thing])
+
+      assert updated_struct.thing == "update"
+
+      {:ok, updated_struct} =
+        %TableBackedSchema{thing: "update", has_one: %HasOne{hen_to_eat: 12}}
+        |> EctoMorph.cast_to_struct(TableBackedSchema, [:thing, has_one: [:hen_to_eat]])
+
+      assert updated_struct.thing == "update"
+
+      changeset =
+        %TableBackedSchema{thing: "update"}
+        |> EctoMorph.generate_changeset(TableBackedSchema)
+
+      assert changeset.changes.thing == "update"
+      assert changeset.valid?
+
+      changeset =
+        %TableBackedSchema{thing: "update"}
+        |> EctoMorph.generate_changeset(TableBackedSchema, [:thing])
+
+      assert changeset.changes.thing == "update"
+      assert changeset.valid?
+
+      changeset =
+        %TableBackedSchema{thing: "update", has_one: %HasOne{hen_to_eat: 12}}
+        |> EctoMorph.generate_changeset(TableBackedSchema, [:thing, has_one: [:hen_to_eat]])
+
+      assert changeset.changes.thing == "update"
+      assert changeset.valid?
+    end
+
     test "Allows schema to be a struct, simply updating it if so" do
       struct_to_update = %SchemaUnderTest{integer: 2, binary: "yis"}
 
