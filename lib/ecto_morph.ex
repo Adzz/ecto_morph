@@ -147,6 +147,13 @@ defmodule EctoMorph do
     generate_changeset(Map.from_struct(data), schema)
   end
 
+  EctoMorph.generate_changeset(%{dat: :a, child: %{thing: :one}}, Data)
+  |> EctoMorph.validate_changeset(%{ Data => fn x -> x end, Thing => &Thang.other/1 })
+  |> EctoMorph.validate_changeset([fn x -> x end, [child: fn y -> y end, [nested_child: fn z -> z end]])
+  # This is a lens
+  |> EctoMorph.validate_changeset([fn x -> x end, [:child, [nested_child: fn z -> z end]])
+
+
   def generate_changeset(data, current = %{__struct__: schema}) do
     generate_changeset(
       data,
