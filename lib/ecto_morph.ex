@@ -1,3 +1,13 @@
+# ######## TODO
+# Explore has_many through
+# has_one through
+# and many to many
+# I don't think it quite works for those situations, or I'm not doing something I should....
+
+# Make the filtering work on relations (recursive)
+# MAke the other one recursive
+# Add an API for configuring a function to carry out the validations.
+
 defmodule EctoMorph do
   @moduledoc """
   Utility functions for Ecto related stuff and things. Check out the functions docs to see what is
@@ -147,12 +157,27 @@ defmodule EctoMorph do
     generate_changeset(Map.from_struct(data), schema)
   end
 
-  EctoMorph.generate_changeset(%{dat: :a, child: %{thing: :one}}, Data)
-  |> EctoMorph.validate_changeset(%{ Data => fn x -> x end, Thing => &Thang.other/1 })
-  |> EctoMorph.validate_changeset([fn x -> x end, [child: fn y -> y end, [nested_child: fn z -> z end]])
-  # This is a lens
-  |> EctoMorph.validate_changeset([fn x -> x end, [:child, [nested_child: fn z -> z end]])
+  # EctoMorph.generate_changeset(%{dat: :a, child: %{thing: :one}}, Data)
+  # |> EctoMorph.validate_changeset(%{ Data => fn x -> x end, Thing => &Thang.other/1 })
+  # |> EctoMorph.validate_changeset([fn x -> x end, [child: fn y -> y end, [nested_child: fn z -> z end]])
+  # # This is a lens
+  # |> EctoMorph.validate_changeset([fn x -> x end, [:child, [nested_child: fn z -> z end]])
 
+  # EctoMorph.cast_to_struct(changes, __MODULE__, [:fields, :we, :care, :about],
+  #   with: [
+  #     sensitivities: [&Domain.Sensitivity.new/1, inner_assoc: &Domain.Inner.new/1],
+  #     other: &Domain.Other.new/1,
+  #   ]
+  # )
+
+  # # This should be possible:
+  # EctoMorph.generate_changeset
+  # |> EctoMorph.validate_change(sensitivitity: Domain.Sensitivity.validate)
+  # # We can select subset of the changes and send here.
+  # # really it's just the changeset that we want. But this happens after the changeset is created
+  # # not before, so we don't pass in callbacks, we deal with the changeset after. We can also pass in
+  # # callbacks if we do the above, allowing us to do stuff before casting takes place. like map the keys I guess.
+  # |> EctoMorph.validate_change([sensitivitity: [inner_thing: Domain.Sensitivity.validate]])
 
   def generate_changeset(data, current = %{__struct__: schema}) do
     generate_changeset(
@@ -224,6 +249,8 @@ defmodule EctoMorph do
       Enum.filter(fields, fn field -> field in schema_fields(schema) end)
       |> Enum.reject(fn field -> field in (assoc_field_whitelist ++ embedded_field_whitelist) end)
 
+    # Hmmmmmm should we filter the data and only cast the assocs that are in changes.
+
     # We only want to cast assocs / embeds if data contains fields that are embeds or assocs.
     # The data could very well have string keys though, but the result of schema_embeds and schema_associations
     # is a map of Atoms. We shouldn't use String.to_atom on data for obvious reasons, so let's go
@@ -294,6 +321,7 @@ defmodule EctoMorph do
         acc ++ Map.get(options_mapping, option, [])
       end)
 
+    # Allow string fields option?
     Map.take(data, fields)
   end
 
@@ -320,6 +348,8 @@ defmodule EctoMorph do
       iex> map_from_struct(%Test{}, [:exclude_timestamps, :exclude_id])
       %Test{foo: "bar"}
   """
+
+  # MAKE THIS RECURSIVE ALSO FOR EMBEDS AND ASSOCS
   @spec map_from_struct(ecto_struct) :: map()
   @spec map_from_struct(ecto_struct, list()) :: map()
   def map_from_struct(struct, options \\ []) do
@@ -333,8 +363,12 @@ defmodule EctoMorph do
         acc ++ Map.get(mapping, option, [])
       end)
 
-    Map.from_struct(struct)
-    |> Map.drop(fields_to_drop)
+    # Map.from_struct(struct)
+    # |> Enum.reduce(%{}, fn
+    #   {key, value}, acc ->
+    #   {key, value}, acc -> Map.merge(acc, %{key => value})
+    # end)
+    # |> Map.drop(fields_to_drop)
   end
 
   defp cast_embeds(changeset, relations) do
@@ -353,8 +387,14 @@ defmodule EctoMorph do
     end)
   end
 
-  defp cast_assocs(changeset, relations) do
-    Enum.reduce(relations, changeset, fn
+  defp cast_assocs(changeset = %{data: %{__struct__: schema}}, relations) do
+    through_associations = through_associations(schema)
+
+    relations
+    # In ecto through relations are read only as you would usually need the id of the joining
+    # relation to insert data into it. But you wont have that. Embeds don't need that.
+    |> Enum.reject(fn r -> r in through_associations end)
+    |> Enum.reduce(changeset, fn
       {relation, fields}, changeset ->
         Ecto.Changeset.cast_assoc(changeset, relation,
           with: fn struct, changes ->
@@ -371,6 +411,15 @@ defmodule EctoMorph do
 
   defp cast(current, data, fields) do
     Ecto.Changeset.cast(current, data, fields)
+  end
+
+  defp through_associations(schema) do
+    Enum.reduce(schema_associations(schema), [], fn assoc, acc ->
+      case schema.__schema__(:association, assoc) |> Map.get(:through) do
+        nil -> acc
+        _ -> [assoc | acc]
+      end
+    end)
   end
 
   defp schema_embeds(schema) do

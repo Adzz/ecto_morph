@@ -2,12 +2,13 @@ defmodule EctoMorphTest do
   use ExUnit.Case
 
   defmodule CustomType do
-    @behaviour Ecto.Type
+    use Ecto.Type
 
     @impl true
     def type, do: :map
 
     @impl true
+    # thing |> IO.inspect(limit: :infinity, label: "")}
     def cast(thing), do: {:ok, thing}
 
     @impl true
@@ -17,7 +18,7 @@ defmodule EctoMorphTest do
     def load(_), do: raise("This will never be called")
 
     @impl true
-    def equal?(_, _), do: true
+    def equal?(l, r), do: l == r
 
     @impl true
     def embed_as(_), do: :self
@@ -82,7 +83,6 @@ defmodule EctoMorphTest do
       field(:naive_datetime_usec, :naive_datetime_usec)
       field(:utc_datetime, :utc_datetime)
       field(:utc_datetime_usec, :utc_datetime_usec)
-
       embeds_many(:steamed_hams, SteamedHams)
       embeds_one(:aurora_borealis, AuroraBorealis)
 
@@ -94,11 +94,20 @@ defmodule EctoMorphTest do
     defstruct [:integer]
   end
 
+  defmodule Through do
+    use Ecto.Schema
+
+    schema "throughs" do
+      field(:cows_to_milk, :integer)
+    end
+  end
+
   defmodule HasMany do
     use Ecto.Schema
 
     schema "newest_table" do
       field(:geese_to_feed, :integer)
+      has_one(:through, Through)
     end
   end
 
@@ -118,8 +127,14 @@ defmodule EctoMorphTest do
       embeds_one(:aurora_borealis, AuroraBorealis)
       has_one(:has_one, HasOne)
       has_many(:has_many, HasMany)
+      has_many(:throughs, through: [:has_many, :through])
     end
   end
+
+  # %TableBackedSchema{
+  #   throughs: %Through{},
+  #   has_many: [%HasMany{through: %Through{}}]
+  # }
 
   setup do
     %{
@@ -181,6 +196,7 @@ defmodule EctoMorphTest do
       assert schema_under_test.naive_datetime == ~N[2000-02-29 00:00:00]
       assert schema_under_test.naive_datetime_usec == ~N[2000-02-29 00:00:00.000000]
       assert schema_under_test.utc_datetime |> DateTime.to_string() == "2019-04-08 14:31:14Z"
+      assert schema_under_test.cutom_type(1)
 
       assert schema_under_test.utc_datetime_usec |> DateTime.to_string() ==
                "2019-04-08 14:31:14.366732Z"
@@ -661,6 +677,10 @@ defmodule EctoMorphTest do
         }
       }
 
+      # Two options.... 1 we have the through assoc in the changes and we want to cast the data
+      # 2. We don't have the assoc and so we want to not do it. If we do cast it, we need
+      # to
+
       assert %Ecto.Changeset{
                valid?: true,
                errors: [],
@@ -877,6 +897,63 @@ defmodule EctoMorphTest do
   end
 
   describe "map_from_struct/2" do
+    test "works on nested relations" do
+      data = %SchemaUnderTest{
+        steamed_hams: [
+          %SteamedHams{meat_type: "beef", pickles: 2, sauce_ratio: "0.5"},
+          %SteamedHams{
+            double_nested_schema: %DoubleNestedSchema{value: "works!"},
+            meat_type: "chicken",
+            pickles: 1,
+            sauce_ratio: "0.7"
+          }
+        ]
+      }
+
+      result = EctoMorph.map_from_struct(data)
+
+      assert result == %{
+               array_of_ints: nil,
+               aurora_borealis: nil,
+               binary: nil,
+               binary_id: nil,
+               boolean: nil,
+               cutom_type: nil,
+               date: nil,
+               float: nil,
+               id: nil,
+               integer: nil,
+               map: nil,
+               map_of_integers: nil,
+               naive_datetime: nil,
+               naive_datetime_usec: nil,
+               name: "Seymour!",
+               percentage: nil,
+               steamed_hams: [
+                 %{
+                   double_nested_schema: nil,
+                   id: nil,
+                   meat_type: "beef",
+                   pickles: 2,
+                   sauce_ratio: "0.5"
+                 },
+                 %{
+                   double_nested_schema: %{
+                     id: nil,
+                     value: "works!"
+                   },
+                   id: nil,
+                   meat_type: "chicken",
+                   pickles: 1,
+                   sauce_ratio: "0.7"
+                 }
+               ],
+               time: nil,
+               utc_datetime: nil,
+               utc_datetime_usec: nil
+             }
+    end
+
     test "creates a map from the struct, dropping the meta key" do
       assert EctoMorph.map_from_struct(%SteamedHams{}) == %{
                id: nil,
@@ -919,6 +996,22 @@ defmodule EctoMorphTest do
   end
 
   describe "filter_by_schema_fields/2" do
+    test "Allows string fields with an option" do
+      data = %{
+        steamed_hams: [
+          %{meat_type: "beef", pickles: 2, sauce_ratio: "0.5"},
+          %{
+            double_nested_schema: %{value: "works!"},
+            meat_type: "chicken",
+            pickles: 1,
+            sauce_ratio: "0.7"
+          }
+        ]
+      }
+
+      assert EctoMorph.filter_by_schema_fields(data, SchemaUnderTest) == 1
+    end
+
     test "returns all the fields in data that are schema fields" do
       data = %{not_in_the_schema: "1", location: 1, probability: 1, actually_a_fire: 1}
 
@@ -964,3 +1057,31 @@ defmodule EctoMorphTest do
     end
   end
 end
+
+defmodule Rating do
+  use Ecto.Schema
+
+  schema "ratings" do
+    field(:score, :integer)
+  end
+end
+
+defmodule Post do
+  use Ecto.Schema
+
+  schema "posts" do
+    has_many(:ratings, Rating)
+  end
+end
+
+defmodule Author do
+  use Ecto.Schema
+
+  schema "authors" do
+    field(:name, :string)
+    has_many(:posts, Post)
+    has_one(:rating, through: [:posts, :rating])
+  end
+end
+
+%{name: "ted", rating: %{score: 10}}
