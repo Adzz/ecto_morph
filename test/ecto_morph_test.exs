@@ -85,7 +85,6 @@ defmodule EctoMorphTest do
 
       embeds_many(:steamed_hams, SteamedHams)
       embeds_one(:aurora_borealis, AuroraBorealis)
-
       field(:cutom_type, CustomType)
     end
   end
@@ -94,11 +93,20 @@ defmodule EctoMorphTest do
     defstruct [:integer]
   end
 
+  defmodule Through do
+    use Ecto.Schema
+
+    schema "through" do
+      field(:rad_level, :integer)
+    end
+  end
+
   defmodule HasMany do
     use Ecto.Schema
 
     schema "newest_table" do
       field(:geese_to_feed, :integer)
+      has_one(:through, Through)
     end
   end
 
@@ -118,6 +126,7 @@ defmodule EctoMorphTest do
       embeds_one(:aurora_borealis, AuroraBorealis)
       has_one(:has_one, HasOne)
       has_many(:has_many, HasMany)
+      has_many(:throughs, through: [:has_many, :through])
     end
   end
 
@@ -630,6 +639,15 @@ defmodule EctoMorphTest do
       assert steamed_ham_one.valid?
       assert steamed_ham_two.valid?
       assert changes.aurora_borealis.valid?
+    end
+
+    test "handles through relations by filtering them" do
+      json = %{
+        "has_one" => %{"hen_to_eat" => 10},
+        "has_many" => [%{"geese_to_feed" => 4}]
+      }
+
+      assert EctoMorph.generate_changeset(json, TableBackedSchema) == []
     end
 
     test "returns invalid changeset when the parent is invalid" do

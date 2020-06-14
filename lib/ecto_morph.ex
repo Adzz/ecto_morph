@@ -271,6 +271,7 @@ defmodule EctoMorph do
 
   defp filter_not_loaded_relations(map = %{}) do
     map
+    |> IO.inspect(limit: :infinity, label: "MAP")
     |> Enum.filter(fn
       {_, %Ecto.Association.NotLoaded{}} -> false
       _ -> true
