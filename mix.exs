@@ -7,11 +7,11 @@ defmodule EctoMorph.MixProject do
       app: :ecto_morph,
       licenses: "",
       description: description(),
-      version: "0.1.14",
+      version: "0.1.15",
       package: package(),
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
-      source_url: "https://github.com/Adzz/Zip",
+      source_url: "https://github.com/Adzz/ecto_morph",
       deps: deps()
     ]
   end
