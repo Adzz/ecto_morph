@@ -1,26 +1,61 @@
 defmodule EctoMorphTest do
   use ExUnit.Case
 
-  defmodule CustomType do
-    @behaviour Ecto.Type
+  defmodule A do
+    use Ecto.Schema
 
-    @impl true
+    embedded_schema do
+      field(:a, :string)
+      field(:number, :integer)
+    end
+
+    def changeset(changes) do
+      EctoMorph.generate_changeset(changes, __MODULE__)
+      |> Ecto.Changeset.validate_number(:number, greater_than: 5)
+      |> EctoMorph.into_struct()
+      |> case do
+        {:ok, struct} -> {:ok, struct}
+        # this ensures these errors appear as errors on the parent...
+
+        # Add to the medium Article about this. Or make a part two and also include the API
+        # in ecto morph to specify the validation function.
+        {:error, changeset} -> {:error, changeset.errors}
+      end
+    end
+  end
+
+  defmodule B do
+    use Ecto.Schema
+
+    embedded_schema do
+      field(:a, :string)
+      field(:name, :string)
+    end
+  end
+
+  defmodule CustomType do
+    use Ecto.Type
     def type, do: :map
 
-    @impl true
-    def cast(thing), do: {:ok, thing}
+    def cast(thing = %{"a" => "b"}) do
+      A.changeset(thing)
+      # EctoMorph.cast_to_struct(thing, A)
+    end
 
-    @impl true
+    def cast(thing = %{a: "b"}) do
+      EctoMorph.cast_to_struct(thing, A)
+    end
+
+    def cast(thing = %{"a" => "a"}) do
+      EctoMorph.cast_to_struct(thing, B)
+    end
+
+    def cast(thing = %{a: "a"}) do
+      EctoMorph.cast_to_struct(thing, B)
+    end
+
     def dump(_), do: raise("This will never be called")
-
-    @impl true
     def load(_), do: raise("This will never be called")
-
-    @impl true
-    def equal?(_, _), do: true
-
-    @impl true
-    def embed_as(_), do: :self
   end
 
   defmodule SchemaWithTimestamps do
@@ -85,7 +120,7 @@ defmodule EctoMorphTest do
 
       embeds_many(:steamed_hams, SteamedHams)
       embeds_one(:aurora_borealis, AuroraBorealis)
-      field(:cutom_type, CustomType)
+      field(:custom_type, CustomType)
     end
   end
 
@@ -163,7 +198,7 @@ defmodule EctoMorphTest do
           "probability" => "0.001",
           "actually_a_fire?" => false
         },
-        "cutom_type" => %{"a" => "b"},
+        "custom_type" => %{"a" => "b", "number" => 10},
         "field_to_ignore" => "ensures we just ignore fields that are not part of the schema"
       }
     }
@@ -190,6 +225,7 @@ defmodule EctoMorphTest do
       assert schema_under_test.naive_datetime == ~N[2000-02-29 00:00:00]
       assert schema_under_test.naive_datetime_usec == ~N[2000-02-29 00:00:00.000000]
       assert schema_under_test.utc_datetime |> DateTime.to_string() == "2019-04-08 14:31:14Z"
+      assert schema_under_test.custom_type == %EctoMorphTest.A{a: "b", id: nil, number: 10}
 
       assert schema_under_test.utc_datetime_usec |> DateTime.to_string() ==
                "2019-04-08 14:31:14.366732Z"
@@ -1023,6 +1059,77 @@ defmodule EctoMorphTest do
                :include_assocs,
                :include_embeds
              ]) == %{aurora_borealis: %{location: 1}, has_one: %{hen_to_eat: 1}}
+    end
+  end
+
+  describe "Specifying validation funs" do
+    # POSSIBLE SYNTAX ?
+
+    # EctoMorph.generate_changeset(attrs, Db.SubMenu,
+    #   validate: [fn changeset -> changeset end],
+    #   fields: [
+    #     :name,
+    #     :id,
+    #     :menu_id,
+    #     meals: [
+    #       validate: fn changeset -> changeset end,
+    #       fields: [
+    #         :day_name,
+    #         :id,
+    #         :type,
+    #         :sub_menu_id,
+    #         components_with_substitutions: [
+    #           fields: [
+    #             :meal_id,
+    #             :id,
+    #             :meal_component_id,
+    #             substitutions: [
+    #               fields: [:component_id, :substitution_id, :id, :order],
+    #               validations: fn ch -> ch end
+    #             ]
+    #           ],
+    #           validate: fn ch -> ch end
+    #         ]
+    #       ]
+    #     ]
+    #   ]
+    # )
+    # |> Db.Repo.insert!(
+    #   returning: true,
+    #   on_conflict: {:replace_all_except, [:id]},
+    #   conflict_target: [:id]
+    # )
+
+    # test "passing validation", %{json: json} do
+    #   ch =
+    #     EctoMorph.generate_changeset(json, SchemaUnderTest)
+    #     #                               # tbis is path to changes
+    #     |> EctoMorph.validate_relation([:aurora_borealis], fn ch ->
+    #       Ecto.Changeset.validate_required(ch, [:location])
+    #     end)
+
+    #   assert ch.valid?
+    # end
+
+    test "when it's invalid", %{json: json} do
+      # Need to make this not clash with options but no fields...
+      # Maybe just a new function name
+      ch =
+        EctoMorph.generate_changeset(json, SchemaUnderTest,
+          validating: [
+            aurora_borealis: fn ch ->
+              Ecto.Changeset.validate_number(ch, :probability, greater_than: 10)
+            end
+          ]
+        )
+
+      refute ch.valid?
+
+      assert ch.errors == [
+               {:probability,
+                {"must be greater than %{number}",
+                 [validation: :number, kind: :greater_than, number: 10]}}
+             ]
     end
   end
 end

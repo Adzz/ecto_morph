@@ -340,6 +340,30 @@ defmodule EctoMorph do
     |> Map.drop(fields_to_drop)
   end
 
+  # def validate_relation(changeset, path_to_relation, validation_fun) do
+
+  #   # update in wont work as changesets dont implement it. So what we have to do is manually
+  #   # recurse. DFS. But that's inefficient. So like it'd be better to get all of the config
+  #   # up front then reduce over the thing once.
+
+  #   with {:relation, changeset = %Ecto.Changeset{}} <-
+  #          {:relation, get_in(changeset.changes, path_to_relation)} do
+  #     update_in(changeset |> Map.from_struct(), [:changes | path_to_relation], fn _ ->
+  #       validation_fun.(changeset)
+  #     end)
+  #     |> IO.inspect(limit: :infinity, label: "")
+  #   else
+  #     {:relation, nil} ->
+  #       {:error,
+  #        "No changes for that relation found. Ensure the relation exists and that there are changes for it in this changeset."}
+  #   end
+
+  #   #   nil ->
+  #   #     {:error,
+  #   #      "No changes for that relation found. Ensure the relation exists and that there are changes for it in this changeset."}
+  #   # end
+  # end
+
   defp cast_embeds(changeset, relations) do
     Enum.reduce(relations, changeset, fn
       {relation, fields}, changeset ->
