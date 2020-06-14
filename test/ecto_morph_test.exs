@@ -644,10 +644,13 @@ defmodule EctoMorphTest do
     test "handles through relations by filtering them" do
       json = %{
         "has_one" => %{"hen_to_eat" => 10},
-        "has_many" => [%{"geese_to_feed" => 4}]
+        # The through change will be filtered out, as it should because we are missing
+        # ids from the tables in between.
+        "has_many" => [%{"geese_to_feed" => 4, "through" => %{"rad_level" => 3}}]
       }
 
-      assert EctoMorph.generate_changeset(json, TableBackedSchema) == []
+      changeset = EctoMorph.generate_changeset(json, TableBackedSchema)
+      assert changeset.valid?
     end
 
     test "returns invalid changeset when the parent is invalid" do

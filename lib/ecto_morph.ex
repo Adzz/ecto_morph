@@ -270,9 +270,7 @@ defmodule EctoMorph do
   end
 
   defp filter_not_loaded_relations(map = %{}) do
-    map
-    |> IO.inspect(limit: :infinity, label: "MAP")
-    |> Enum.filter(fn
+    Enum.filter(map, fn
       {_, %Ecto.Association.NotLoaded{}} -> false
       _ -> true
     end)
@@ -387,6 +385,12 @@ defmodule EctoMorph do
   end
 
   defp schema_associations(schema) do
+    # __schema__(associations) will include through associations but through assocs cannot be
+    # casted with cast_assoc, so we just filter them out here.
     schema.__schema__(:associations)
+    |> Enum.filter(fn assoc ->
+      # If the through assoc is not in the __changeset__ map, then it can go!
+      Map.get(schema.__changeset__(), assoc, false)
+    end)
   end
 end
