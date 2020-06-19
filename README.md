@@ -29,6 +29,10 @@ Now we can do this:
 
 ```elixir
 EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test)
+
+# or
+
+EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing, embed: [:bar]])
 ```
 
 Or something like this:
