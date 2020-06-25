@@ -33,6 +33,20 @@ EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test)
 # or
 
 EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing, embed: [:bar]])
+
+# The data can also be a struct so this would work:
+EctoMorph.cast_to_struct(%Test{thing: "foo", embed: %Embed{bar: "baz"}}, Test, [:thing, embed: [:bar]])
+
+# So would this:
+EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, %Test{}, [:thing, embed: [:bar]])
+
+# Changes can even be a different struct, if it has overlapping keys they will be casted as expected:
+
+defmoule OtherStruct do
+  defstruct [:thing, :embed]
+end
+
+EctoMorph.cast_to_struct(%OtherStruct{thing: "foo", embed: %{"bar"=> "baz"}}, %Test{}, [:thing, embed: [:bar]])
 ```
 
 Or something like this:
