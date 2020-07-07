@@ -124,8 +124,8 @@ EctoMorph.filter_by_schema_fields(%{"random" => "data", "more" => "fields"}, Tes
 
 Check out the docs folder for more examples, table of contents below:
 
-- [Casting data](https://github.com/Adzz/ecto_morph/blob/master/docs/casting_data.md)
-- [Creating a has_one_of relation](https://github.com/Adzz/ecto_morph/blob/master/docs/has_one_of.md)
+- [Casting data](https://medium.com/@ItizAdz/ecto-cast-ing-sugar-31bddbc62cd7)
+- [Creating a has_one_of relation](https://medium.com/@ItizAdz/creating-a-has-one-of-association-in-ecto-with-ectomorph-3932adb996d9)
 
 ## Installation
 
