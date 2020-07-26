@@ -16,7 +16,6 @@ defmodule EctoMorphTest do
       |> case do
         {:ok, struct} -> {:ok, struct}
         # this ensures these errors appear as errors on the parent...
-
         # Add to the medium Article about this. Or make a part two and also include the API
         # in ecto morph to specify the validation function.
         {:error, changeset} -> {:error, changeset.errors}
@@ -39,7 +38,6 @@ defmodule EctoMorphTest do
 
     def cast(thing = %{"a" => "b"}) do
       A.changeset(thing)
-      # EctoMorph.cast_to_struct(thing, A)
     end
 
     def cast(thing = %{a: "b"}) do
@@ -1063,72 +1061,28 @@ defmodule EctoMorphTest do
   end
 
   describe "Specifying validation funs" do
-    # POSSIBLE SYNTAX ?
-
-    # EctoMorph.generate_changeset(attrs, Db.SubMenu,
-    #   validate: [fn changeset -> changeset end],
-    #   fields: [
-    #     :name,
-    #     :id,
-    #     :menu_id,
-    #     meals: [
-    #       validate: fn changeset -> changeset end,
-    #       fields: [
-    #         :day_name,
-    #         :id,
-    #         :type,
-    #         :sub_menu_id,
-    #         components_with_substitutions: [
-    #           fields: [
-    #             :meal_id,
-    #             :id,
-    #             :meal_component_id,
-    #             substitutions: [
-    #               fields: [:component_id, :substitution_id, :id, :order],
-    #               validations: fn ch -> ch end
-    #             ]
-    #           ],
-    #           validate: fn ch -> ch end
-    #         ]
-    #       ]
-    #     ]
-    #   ]
-    # )
-    # |> Db.Repo.insert!(
-    #   returning: true,
-    #   on_conflict: {:replace_all_except, [:id]},
-    #   conflict_target: [:id]
-    # )
-
-    # test "passing validation", %{json: json} do
-    #   ch =
-    #     EctoMorph.generate_changeset(json, SchemaUnderTest)
-    #     #                               # tbis is path to changes
-    #     |> EctoMorph.validate_relation([:aurora_borealis], fn ch ->
-    #       Ecto.Changeset.validate_required(ch, [:location])
-    #     end)
-
-    #   assert ch.valid?
-    # end
-
     test "when it's invalid", %{json: json} do
       # Need to make this not clash with options but no fields...
       # Maybe just a new function name
+      json = %{
+        "aurora_borealis" => %{
+          "probability" => "0.001"
+        }
+      }
+
       ch =
-        EctoMorph.generate_changeset(json, SchemaUnderTest,
-          validating: [
-            aurora_borealis: fn ch ->
-              Ecto.Changeset.validate_number(ch, :probability, greater_than: 10)
-            end
-          ]
-        )
+        EctoMorph.generate_changeset(json, SchemaUnderTest)
+        |> EctoMorph.validate_nested_changeset([:aurora_borealis], fn changeset ->
+          changeset
+          |> Ecto.Changeset.validate_number(:probability, greater_than: 5)
+        end)
 
       refute ch.valid?
 
-      assert ch.errors == [
+      assert ch.changes.aurora_borealis.errors == [
                {:probability,
                 {"must be greater than %{number}",
-                 [validation: :number, kind: :greater_than, number: 10]}}
+                 [validation: :number, kind: :greater_than, number: 5]}}
              ]
     end
   end
