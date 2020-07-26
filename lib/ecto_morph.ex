@@ -340,6 +340,21 @@ defmodule EctoMorph do
     |> Map.drop(fields_to_drop)
   end
 
+  defmodule InvalidPathError do
+    @moduledoc """
+    validate_nested_changeset requires a path in which each location points to a nested changeset.
+    If we are not given that, we raise an error.
+    """
+    defexception message:
+                   "EctoMorph.validate_nested_changeset/3 requires that each field " <>
+                     "in the path_to_nested_changeset points to a nested changeset."
+  end
+
+  defmodule InvalidValidationFunction do
+    defexception message:
+                   "Validation functions are expected to take a changeset and to return one"
+  end
+
   @doc """
   Allows us to specify validations for nested changesets. Accepts a path to a nested changeset,
   and a validation function. The validation fun will be passed the changeset at the end of the
@@ -349,35 +364,63 @@ defmodule EctoMorph do
   changeset between the root changeset and the nested one), but the error messages will remain
   on the changeset they are relevant for. This is in line with how Ecto works elsewhere like
   in cast_embed etc. To get the nested error messages you can use `Ecto.Changeset.traverse_errors`
+
+  ### Examples
+
+  ```elixir
+  EctoMorph.generate_changeset(%{nested: %{foo: 3}})
+  |> EctoMorph.validate_nested_changeset([:nested], fn changeset ->
+    Ecto.Changeset.validate_number(changeset, :foo, greater_than: 5)
+  end)
+
+  changeset = EctoMorph.generate_changeset(%{nested: %{double_nested: %{field: 6}}})
+  EctoMorph.validate_nested_changeset(changeset, [:nested, :double_nested], &MySchema.validate/1)
+  ```
   """
-  def validate_nested_changeset(changeset, path_to_schema = [field | _], validation_fun) do
-    walk_the_path(changeset, {[], path_to_schema}, validation_fun)
+  def validate_nested_changeset(_, [], _) do
+    raise InvalidPathError, "You must provide at least one field in the path"
+  end
+
+  def validate_nested_changeset(changeset, path_to_nested_changeset, validation_fun) do
+    walk_the_path(changeset, {[], path_to_nested_changeset}, validation_fun)
   end
 
   # We are at the end if the remaining_path is empty.
   def walk_the_path(changeset, {[{field, child}], []}, validation_fun) do
     # Again raise a better error but the validation fun should accept and return a changeset.
     # (and ideally not do any side effects)
-    validated = %Ecto.Changeset{} = validation_fun.(child)
-    new_changes = %{ changeset.changes | field => validated}
-    retreat(%{changeset | changes: new_changes, valid?: validated.valid? }, [])
+    with validated = %Ecto.Changeset{} <- validation_fun.(child) do
+      new_changes = %{changeset.changes | field => validated}
+      retreat(%{changeset | changes: new_changes, valid?: validated.valid?}, [])
+    else
+      _ -> raise InvalidValidationFunction
+    end
   end
 
   def walk_the_path(changeset, {[{field, child} | rest = [{_, parent} | _]], []}, validation_fun) do
-    validated = %Ecto.Changeset{} = validation_fun.(child)
-    new_changes = %{ changeset.changes | field => validated}
-    retreat(%{parent | changes: new_changes, valid?: validated.valid?}, rest)
+    with validated = %Ecto.Changeset{} <- validation_fun.(child) do
+      new_changes = %{changeset.changes | field => validated}
+      retreat(%{parent | changes: new_changes, valid?: validated.valid?}, rest)
+    else
+      _ -> raise InvalidValidationFunction
+    end
   end
 
   def walk_the_path(changeset, {prev_changesets, [field | rest]}, validation_fun) do
-    # This should be a changeset, otherwise the path is wrong. We can enforce that with a better error
-    nested_changeset = %Ecto.Changeset{} = Map.fetch!(changeset.changes, field)
-    # We have to put the whole changeset in not the field
-    walk_the_path(
-      changeset,
-      {[{field, nested_changeset} | prev_changesets], rest},
-      validation_fun
-    )
+    with nested_changeset = %Ecto.Changeset{} <- Map.get(changeset.changes, field) do
+      walk_the_path(
+        changeset,
+        {[{field, nested_changeset} | prev_changesets], rest},
+        validation_fun
+      )
+    else
+      _ ->
+        raise InvalidPathError, """
+        EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
+        points to a nested changeset. It looks like :#{field} points to a change that isn't a nested
+        changeset, or doesn't exist at all.
+        """
+    end
   end
 
   def retreat(changeset, []) do
@@ -389,7 +432,7 @@ defmodule EctoMorph do
   end
 
   def retreat(changeset, [{field, _} | rest = [{_, parent} | _]]) do
-    new_changes = %{ parent.changes | field => changeset}
+    new_changes = %{parent.changes | field => changeset}
     retreat(%{parent | changes: new_changes, valid?: changeset.valid?}, rest)
   end
 

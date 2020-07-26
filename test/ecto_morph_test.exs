@@ -1061,14 +1061,20 @@ defmodule EctoMorphTest do
   end
 
   describe "Specifying validation funs" do
-    test "when it's invalid", %{json: json} do
-      # Need to make this not clash with options but no fields...
-      # Maybe just a new function name
-      json = %{
-        "aurora_borealis" => %{
-          "probability" => "0.001"
-        }
-      }
+    test "When it is valid, it's all good", %{json: json} do
+      result =
+        EctoMorph.generate_changeset(json, SchemaUnderTest)
+        |> EctoMorph.validate_nested_changeset([:aurora_borealis], fn changeset ->
+          changeset
+          |> Ecto.Changeset.validate_number(:probability, less_than: 5)
+        end)
+
+      assert result.valid? == true
+      assert result.changes.aurora_borealis.errors == []
+    end
+
+    test "when it's invalid" do
+      json = %{"aurora_borealis" => %{"probability" => "0.001"}}
 
       ch =
         EctoMorph.generate_changeset(json, SchemaUnderTest)
@@ -1084,6 +1090,47 @@ defmodule EctoMorphTest do
                 {"must be greater than %{number}",
                  [validation: :number, kind: :greater_than, number: 5]}}
              ]
+    end
+
+    test "When the path doesn't point to a changeset we raise an IncorrectPath error", %{
+      json: json
+    } do
+      ch = EctoMorph.generate_changeset(json, SchemaUnderTest)
+
+      error_message =
+        "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset\npoints to a nested changeset. It looks like :not_a_field points to a change that isn't a nested\nchangeset, or doesn't exist at all.\n"
+
+      assert_raise(EctoMorph.InvalidPathError, error_message, fn ->
+        EctoMorph.validate_nested_changeset(ch, [:not_a_field], & &1)
+      end)
+
+      error_message =
+        "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset\npoints to a nested changeset. It looks like :integer points to a change that isn't a nested\nchangeset, or doesn't exist at all.\n"
+
+      assert_raise(EctoMorph.InvalidPathError, error_message, fn ->
+        EctoMorph.validate_nested_changeset(ch, [:integer], & &1)
+      end)
+
+      assert_raise(EctoMorph.InvalidPathError, error_message, fn ->
+        EctoMorph.validate_nested_changeset(ch, [:aurora_borealis, :integer], & &1)
+      end)
+    end
+
+    test "empty path", %{json: json} do
+      ch = EctoMorph.generate_changeset(json, SchemaUnderTest)
+      error_message = "You must provide at least one field in the path"
+      assert_raise(EctoMorph.InvalidPathError, error_message, fn ->
+        EctoMorph.validate_nested_changeset(ch, [], & &1)
+      end)
+    end
+
+    test "invalid validation function", %{json: json} do
+      ch = EctoMorph.generate_changeset(json, SchemaUnderTest)
+      error_message = "Validation functions are expected to take a changeset and to return one"
+
+      assert_raise(EctoMorph.InvalidValidationFunction, error_message, fn ->
+        EctoMorph.validate_nested_changeset(ch, [:aurora_borealis], fn _ -> :hi end)
+      end)
     end
   end
 end
