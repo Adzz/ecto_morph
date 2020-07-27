@@ -117,6 +117,7 @@ defmodule EctoMorphTest do
       field(:utc_datetime_usec, :utc_datetime_usec)
 
       embeds_many(:steamed_hams, SteamedHams)
+      embeds_one(:steamed_ham, SteamedHams)
       embeds_one(:aurora_borealis, AuroraBorealis)
       field(:custom_type, CustomType)
     end
@@ -1073,6 +1074,74 @@ defmodule EctoMorphTest do
       assert result.changes.aurora_borealis.errors == []
     end
 
+    test "multi nested schemas work fine" do
+      # PASS validation
+      result =
+        %{steamed_ham: %{double_nested_schema: %{value: "This is a string"}}}
+        |> EctoMorph.generate_changeset(SchemaUnderTest)
+        |> EctoMorph.validate_nested_changeset([:steamed_ham, :double_nested_schema], & &1)
+
+      assert result.valid?
+
+      # FAIL validation
+      result =
+        %{steamed_ham: %{double_nested_schema: %{value: "This is a string"}}}
+        |> EctoMorph.generate_changeset(SchemaUnderTest)
+        |> EctoMorph.validate_nested_changeset([:steamed_ham, :double_nested_schema], fn ch ->
+          Ecto.Changeset.validate_length(ch, :value, min: 50)
+        end)
+
+      assert result.valid? == false
+
+      assert result.changes.steamed_ham.changes.double_nested_schema.errors == [
+               {:value,
+                {"should be at least %{count} character(s)",
+                 [count: 50, validation: :length, kind: :min, type: :string]}}
+             ]
+    end
+
+    test "When we has many we apply the validation to each changeset in the list", %{json: json} do
+      # Pass validation
+      result =
+        EctoMorph.generate_changeset(json, SchemaUnderTest)
+        |> EctoMorph.validate_nested_changeset([:steamed_hams], fn changeset ->
+          changeset
+          |> Ecto.Changeset.validate_number(:pickles, less_than: 5)
+        end)
+
+      # What if some of the has_many don't have the nested data in it? Not invalid, but we also haven't
+      # validated it....
+      assert result.valid? == true
+      assert Enum.map(result.changes.steamed_hams, & &1.errors) == [[], []]
+
+      # Fail validation
+      result =
+        EctoMorph.generate_changeset(json, SchemaUnderTest)
+        |> EctoMorph.validate_nested_changeset([:steamed_hams], fn changeset ->
+          changeset
+          |> Ecto.Changeset.validate_number(:pickles, greater_than: 5)
+        end)
+
+      assert result.valid? == false
+
+      assert Enum.map(result.changes.steamed_hams, & &1.errors) == [
+               [
+                 {:pickles,
+                  {"must be greater than %{number}",
+                   [validation: :number, kind: :greater_than, number: 5]}}
+               ],
+               [
+                 {:pickles,
+                  {"must be greater than %{number}",
+                   [validation: :number, kind: :greater_than, number: 5]}}
+               ]
+             ]
+    end
+
+    test "has_many fails" do
+      # always embeds / embeds_many has_one / has_many...
+    end
+
     test "when it's invalid" do
       json = %{"aurora_borealis" => %{"probability" => "0.001"}}
 
@@ -1119,6 +1188,7 @@ defmodule EctoMorphTest do
     test "empty path", %{json: json} do
       ch = EctoMorph.generate_changeset(json, SchemaUnderTest)
       error_message = "You must provide at least one field in the path"
+
       assert_raise(EctoMorph.InvalidPathError, error_message, fn ->
         EctoMorph.validate_nested_changeset(ch, [], & &1)
       end)

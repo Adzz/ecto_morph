@@ -382,38 +382,58 @@ defmodule EctoMorph do
   end
 
   def validate_nested_changeset(changeset, path_to_nested_changeset, validation_fun) do
-    walk_the_path(changeset, {[], path_to_nested_changeset}, validation_fun)
+    walk_the_path({[{nil, changeset}], path_to_nested_changeset}, validation_fun)
   end
 
-  # We are at the end if the remaining_path is empty.
-  def walk_the_path(changeset, {[{field, child}], []}, validation_fun) do
-    # Again raise a better error but the validation fun should accept and return a changeset.
-    # (and ideally not do any side effects)
-    with validated = %Ecto.Changeset{} <- validation_fun.(child) do
-      new_changes = %{changeset.changes | field => validated}
-      retreat(%{changeset | changes: new_changes, valid?: validated.valid?}, [])
+  # Child could be children...
+  def walk_the_path({[{field, child}, {_, parent = %Ecto.Changeset{}}], []}, validation_fun) do
+    if is_list(child) do
+      # This would be a has_many.we know the end is a has many I guess...
+      {valid?, children} =
+        Enum.reduce(child, {true, []}, fn ch, {valid, acc} ->
+          with validated = %Ecto.Changeset{} <- validation_fun.(ch) do
+            {valid && validated.valid?, [validated | acc]}
+          else
+            _ -> raise InvalidValidationFunction
+          end
+        end)
+
+      new_changes = %{parent.changes | field => children}
+      retreat(%{parent | changes: new_changes, valid?: valid?}, [])
     else
-      _ -> raise InvalidValidationFunction
+      with validated = %Ecto.Changeset{} <- validation_fun.(child) do
+        new_changes = %{parent.changes | field => validated}
+        retreat(%{parent | changes: new_changes, valid?: validated.valid?}, [])
+      else
+        _ -> raise InvalidValidationFunction
+      end
     end
   end
 
-  def walk_the_path(changeset, {[{field, child} | rest = [{_, parent} | _]], []}, validation_fun) do
+  # Child could be children...
+  def walk_the_path({[{field, child} | rest = [{_, parent} | _]], []}, validation_fun) do
     with validated = %Ecto.Changeset{} <- validation_fun.(child) do
-      new_changes = %{changeset.changes | field => validated}
+      new_changes = %{parent.changes | field => validated}
       retreat(%{parent | changes: new_changes, valid?: validated.valid?}, rest)
     else
       _ -> raise InvalidValidationFunction
     end
   end
 
-  def walk_the_path(changeset, {prev_changesets, [field | rest]}, validation_fun) do
-    with nested_changeset = %Ecto.Changeset{} <- Map.get(changeset.changes, field) do
-      walk_the_path(
-        changeset,
-        {[{field, nested_changeset} | prev_changesets], rest},
-        validation_fun
-      )
-    else
+  def walk_the_path({prev_changesets = [{_, parent} | _], [field | rest]}, validation_fun) do
+    case Map.get(parent.changes, field) do
+      nested_changeset = %Ecto.Changeset{} ->
+        walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
+
+      changesets = [%Ecto.Changeset{} | _] ->
+        # # Ahhh. brain melt. we have to call validate_nested_changeset on all these, then group them
+        # # together to merge back into the parent changeset somehow...
+        # changesets = Enum.map(changesets, fn ch ->
+        #   walk_the_path(changeset, {[{field, ch} | prev_changesets], rest}, validation_fun)
+        #   |> IO.inspect(limit: :infinity, label: "WALK")
+        # end)
+        walk_the_path({[{field, changesets} | prev_changesets], rest}, validation_fun)
+
       _ ->
         raise InvalidPathError, """
         EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
@@ -427,8 +447,9 @@ defmodule EctoMorph do
     changeset
   end
 
-  def retreat(changeset, [{field, _}, parent = %Ecto.Changeset{}]) do
-    %{parent | field => changeset}
+  def retreat(changeset, [{field, _}, {_, parent = %Ecto.Changeset{}}]) do
+    new_changes = %{parent.changes | field => changeset}
+    %{parent | changes: new_changes, valid?: changeset.valid?}
   end
 
   def retreat(changeset, [{field, _} | rest = [{_, parent} | _]]) do
