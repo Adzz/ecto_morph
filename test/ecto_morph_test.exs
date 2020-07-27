@@ -1109,8 +1109,6 @@ defmodule EctoMorphTest do
           |> Ecto.Changeset.validate_number(:pickles, less_than: 5)
         end)
 
-      # What if some of the has_many don't have the nested data in it? Not invalid, but we also haven't
-      # validated it....
       assert result.valid? == true
       assert Enum.map(result.changes.steamed_hams, & &1.errors) == [[], []]
 
@@ -1138,8 +1136,23 @@ defmodule EctoMorphTest do
              ]
     end
 
-    test "has_many fails" do
-      # always embeds / embeds_many has_one / has_many...
+    test "has_many nested " do
+      # Pass validation
+      json = %{
+        steamed_hams: [
+          %{double_nested_schema: %{value: "Hi"}},
+          %{double_nested_schema: %{value: "Hi there"}},
+          %{double_nested_schema: %{value: "Passing validation is easy"}},
+        ]
+      }
+
+      result =
+        EctoMorph.generate_changeset(json, SchemaUnderTest)
+        |> EctoMorph.validate_nested_changeset([:steamed_hams, :double_nested_schema], fn ch ->
+          Ecto.Changeset.validate_length(ch, :value, min: 15)
+        end)
+
+      assert result.valid? == false
     end
 
     test "when it's invalid" do

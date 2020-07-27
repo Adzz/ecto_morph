@@ -365,6 +365,9 @@ defmodule EctoMorph do
   on the changeset they are relevant for. This is in line with how Ecto works elsewhere like
   in cast_embed etc. To get the nested error messages you can use `Ecto.Changeset.traverse_errors`
 
+  This works with has_many relations by validating the list of changesets. If you are validating
+  their nested relations, each changeset in the list must have the nested relation in their changes.
+
   ### Examples
 
   ```elixir
@@ -385,10 +388,8 @@ defmodule EctoMorph do
     walk_the_path({[{nil, changeset}], path_to_nested_changeset}, validation_fun)
   end
 
-  # Child could be children...
   def walk_the_path({[{field, child}, {_, parent = %Ecto.Changeset{}}], []}, validation_fun) do
     if is_list(child) do
-      # This would be a has_many.we know the end is a has many I guess...
       {valid?, children} =
         Enum.reduce(child, {true, []}, fn ch, {valid, acc} ->
           with validated = %Ecto.Changeset{} <- validation_fun.(ch) do
@@ -410,36 +411,76 @@ defmodule EctoMorph do
     end
   end
 
-  # Child could be children...
   def walk_the_path({[{field, child} | rest = [{_, parent} | _]], []}, validation_fun) do
-    with validated = %Ecto.Changeset{} <- validation_fun.(child) do
-      new_changes = %{parent.changes | field => validated}
-      retreat(%{parent | changes: new_changes, valid?: validated.valid?}, rest)
+    if is_list(child) do
+      {valid?, children} =
+        Enum.reduce(child, {true, []}, fn ch, {valid, acc} ->
+          with validated = %Ecto.Changeset{} <- validation_fun.(ch) do
+            {valid && validated.valid?, [validated | acc]}
+          else
+            _ -> raise InvalidValidationFunction
+          end
+        end)
+
+      new_changes = %{parent.changes | field => children}
+      retreat(%{parent | changes: new_changes, valid?: valid?}, [])
     else
-      _ -> raise InvalidValidationFunction
+      with validated = %Ecto.Changeset{} <- validation_fun.(child) do
+        # Parent is a list.... In which case we want to retreat for every element in the list, then
+        # retreat the list. I think...?
+        if is_list(parent) do
+          Enum.map(parent, fn p ->
+            new_changes = %{p.changes | field => validated}
+            retreat(%{p | changes: new_changes, valid?: validated.valid?}, rest)
+          end)
+          # retreat(%{p | changes: new_changes, valid?: validated.valid?}, rest)
+        else
+          new_changes = %{parent.changes | field => validated}
+          retreat(%{parent | changes: new_changes, valid?: validated.valid?}, rest)
+        end
+      else
+        _ -> raise InvalidValidationFunction
+      end
     end
   end
 
+  # Now parent can be a list when has_many -> it's child / children....
   def walk_the_path({prev_changesets = [{_, parent} | _], [field | rest]}, validation_fun) do
-    case Map.get(parent.changes, field) do
-      nested_changeset = %Ecto.Changeset{} ->
-        walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
+    # This will be a list if we are validating associations of a has_many. I.e we are validating Z
+    # when X has_many Y has_one (or many) Z
+    if is_list(parent) do
+      # do we just recur here? I think we have to merge these all into a parent somewhere...
+      Enum.map(parent, fn each ->
+        case Map.get(each.changes, field)do
+          nested_changeset = %Ecto.Changeset{} ->
+            walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
 
-      changesets = [%Ecto.Changeset{} | _] ->
-        # # Ahhh. brain melt. we have to call validate_nested_changeset on all these, then group them
-        # # together to merge back into the parent changeset somehow...
-        # changesets = Enum.map(changesets, fn ch ->
-        #   walk_the_path(changeset, {[{field, ch} | prev_changesets], rest}, validation_fun)
-        #   |> IO.inspect(limit: :infinity, label: "WALK")
-        # end)
-        walk_the_path({[{field, changesets} | prev_changesets], rest}, validation_fun)
+          changesets = [%Ecto.Changeset{} | _] ->
+            walk_the_path({[{field, changesets} | prev_changesets], rest}, validation_fun)
 
-      _ ->
-        raise InvalidPathError, """
-        EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
-        points to a nested changeset. It looks like :#{field} points to a change that isn't a nested
-        changeset, or doesn't exist at all.
-        """
+          _ ->
+            raise InvalidPathError, """
+            EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
+            points to a nested changeset. It looks like :#{field} points to a change that isn't a nested
+            changeset, or doesn't exist at all.
+            """
+        end
+      end)
+    else
+      case Map.get(parent.changes, field) do
+        nested_changeset = %Ecto.Changeset{} ->
+          walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
+
+        changesets = [%Ecto.Changeset{} | _] ->
+          walk_the_path({[{field, changesets} | prev_changesets], rest}, validation_fun)
+
+        _ ->
+          raise InvalidPathError, """
+          EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
+          points to a nested changeset. It looks like :#{field} points to a change that isn't a nested
+          changeset, or doesn't exist at all.
+          """
+      end
     end
   end
 
