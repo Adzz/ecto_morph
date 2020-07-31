@@ -141,6 +141,7 @@ defmodule EctoMorphTest do
     schema "newest_table" do
       field(:geese_to_feed, :integer)
       has_one(:through, Through)
+      has_many(:steamed_hams, SteamedHams)
     end
   end
 
@@ -1082,11 +1083,16 @@ defmodule EctoMorphTest do
           |> Ecto.Changeset.validate_number(:probability, greater_than: 5)
         end)
 
-      assert result.valid? == true
-      assert result.changes.aurora_borealis.errors == []
+      assert result.valid? == false
+
+      assert result.changes.aurora_borealis.errors == [
+               {:probability,
+                {"must be greater than %{number}",
+                 [validation: :number, kind: :greater_than, number: 5]}}
+             ]
     end
 
-    test "multi nested schemas work fine" do
+    test "has one that has one - multi nested schemas" do
       # PASS validation
       result =
         %{steamed_ham: %{double_nested_schema: %{value: "This is a string"}}}
@@ -1112,7 +1118,7 @@ defmodule EctoMorphTest do
              ]
     end
 
-    test "When we has many we apply the validation to each changeset in the list", %{json: json} do
+    test "Has many - all of them get validated.", %{json: json} do
       # Pass validation
       result =
         EctoMorph.generate_changeset(json, SchemaUnderTest)
@@ -1151,7 +1157,7 @@ defmodule EctoMorphTest do
              ]
     end
 
-    test "has_many nested " do
+    test "has_many that has_one " do
       json = %{
         steamed_hams: [
           %{double_nested_schema: %{value: "Hi"}},
@@ -1182,6 +1188,59 @@ defmodule EctoMorphTest do
              ]
 
       assert third.changes.double_nested_schema.errors == []
+    end
+
+    test "has_many that has_many - all of them get validated, throughs are ignored" do
+      json = %{
+        "throughs" => %{"rad_level" => 16},
+        "has_many" => [
+          %{"steamed_hams" => [%{"pickles" => 1}, %{"pickles" => 2}]},
+          %{"steamed_hams" => [%{"pickles" => 1}]},
+          %{"steamed_hams" => [%{"pickles" => 4}, %{"pickles" => 5}]}
+        ]
+      }
+
+      result =
+        EctoMorph.generate_changeset(json, TableBackedSchema)
+        |> EctoMorph.validate_nested_changeset([:has_many, :steamed_hams], fn changeset ->
+          changeset
+          |> Ecto.Changeset.validate_number(:pickles, greater_than: 3)
+        end)
+
+      [first, second, third] = result.changes.has_many
+
+      [ham_1, ham_2] = first.changes.steamed_hams
+      [ham_3] = second.changes.steamed_hams
+      [ham_4, ham_5] = third.changes.steamed_hams
+
+      assert ham_1.valid? == false
+
+      assert ham_1.errors == [
+               {:pickles,
+                {"must be greater than %{number}",
+                 [validation: :number, kind: :greater_than, number: 3]}}
+             ]
+
+      assert ham_2.valid? == false
+
+      assert ham_2.errors == [
+               {:pickles,
+                {"must be greater than %{number}",
+                 [validation: :number, kind: :greater_than, number: 3]}}
+             ]
+
+      assert ham_3.valid? == false
+
+      assert ham_3.errors == [
+               {:pickles,
+                {"must be greater than %{number}",
+                 [validation: :number, kind: :greater_than, number: 3]}}
+             ]
+
+      assert ham_4.valid?
+      assert ham_4.errors == []
+      assert ham_5.valid?
+      assert ham_5.errors == []
     end
 
     test "when it's invalid" do
