@@ -86,13 +86,41 @@ Often you'll want to do some validations, that's easy:
 |> Ecto.Changeset.validate_required([:thing])
 |> EctoMorph.into_struct()
 
-# or 
+# or
 
 %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
 |> EctoMorph.generate_changeset(Test, [:thing])
 |> Ecto.Changeset.validate_change(...)
 |> Repo.insert!
 ```
+
+### Valiating Nested Changesets
+
+Easily the coolest feature, say you have nested changesets via embeds or has_one/many, you can now specify a path to a changeset and specify a validation function for the changeset(s) at the end of that path. If your path ends at a list of changesets (because your model has a has_many relation for example), each of those changesets will be validated.
+
+```elixir
+%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
+|> EctoMorph.generate_changeset(Test)
+|> EctoMorph.validate_nested_changeset([:embed], &MyEmbed.validate/1)
+
+# or
+json = %{
+  "has_many" => [
+    %{"steamed_hams" => [%{"pickles" => 1}, %{"pickles" => 2}]},
+    %{"steamed_hams" => [%{"pickles" => 1}]},
+    %{"steamed_hams" => [%{"pickles" => 4}, %{"pickles" => 5}]}
+  ]
+}
+
+# Here each of the steamed_hams above will have their pickle count validated:
+
+EctoMorph.generate_changeset(json, MySchema)
+|> EctoMorph.validate_nested_changeset([:has_many, :steamed_hams], fn changeset ->
+  changeset
+  |> Ecto.Changeset.validate_number(:pickles, greater_than: 3)
+end)
+```
+
 
 Other abilities include creating a map from an ecto struct, dropping optional fields if you decide to:
 
@@ -135,7 +163,7 @@ by adding `ecto_morph` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:ecto_morph, "~> 0.1.15"}
+    {:ecto_morph, "~> 0.1.16"}
   ]
 end
 ```
