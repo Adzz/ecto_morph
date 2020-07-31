@@ -1122,17 +1122,20 @@ defmodule EctoMorphTest do
 
       assert result.valid? == false
 
-      assert Enum.map(result.changes.steamed_hams, & &1.errors) == [
-               [
-                 {:pickles,
-                  {"must be greater than %{number}",
-                   [validation: :number, kind: :greater_than, number: 5]}}
-               ],
-               [
-                 {:pickles,
-                  {"must be greater than %{number}",
-                   [validation: :number, kind: :greater_than, number: 5]}}
-               ]
+      [first, second] = result.changes.steamed_hams
+      assert first.valid? == false
+      assert second.valid? == false
+
+      assert first.errors == [
+               {:pickles,
+                {"must be greater than %{number}",
+                 [validation: :number, kind: :greater_than, number: 55]}}
+             ]
+
+      assert second.errors == [
+               {:pickles,
+                {"must be greater than %{number}",
+                 [validation: :number, kind: :greater_than, number: 55]}}
              ]
     end
 

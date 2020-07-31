@@ -388,6 +388,16 @@ defmodule EctoMorph do
     walk_the_path({[{nil, changeset}], path_to_nested_changeset}, validation_fun)
   end
 
+  def walk_the_path({[{field, parent = %Ecto.Changeset{}}], []}, validation_fun) do
+    with validated = %Ecto.Changeset{} <- validation_fun.(parent) do
+      # new_changes = %{parent.changes | field => validated}
+      # retreat(%{parent | changes: new_changes, valid?: validated.valid?}, [])
+      validated
+    else
+      _ -> raise InvalidValidationFunction
+    end
+  end
+
   def walk_the_path({[{field, child}, {_, parent = %Ecto.Changeset{}}], []}, validation_fun) do
     "First" |> IO.inspect(limit: :infinity, label: "")
 
@@ -429,8 +439,8 @@ defmodule EctoMorph do
           Enum.reduce(changesets, {true, []}, fn nested_changeset, {valid, acc} ->
             # validate_nested_changeset(nested_changeset, rest, validation_fun)
             result =
-              walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
-              |> IO.inspect(limit: :infinity, label: "")
+              walk_the_path({[{field, nested_changeset}], rest}, validation_fun)
+              |> IO.inspect(limit: :infinity, label: "RESULT")
 
             {valid && result.valid?, [result | acc]}
           end)
