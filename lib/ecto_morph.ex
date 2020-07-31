@@ -390,8 +390,6 @@ defmodule EctoMorph do
 
   def walk_the_path({[{field, parent = %Ecto.Changeset{}}], []}, validation_fun) do
     with validated = %Ecto.Changeset{} <- validation_fun.(parent) do
-      # new_changes = %{parent.changes | field => validated}
-      # retreat(%{parent | changes: new_changes, valid?: validated.valid?}, [])
       validated
     else
       _ -> raise InvalidValidationFunction
@@ -399,10 +397,7 @@ defmodule EctoMorph do
   end
 
   def walk_the_path({[{field, child}, {_, parent = %Ecto.Changeset{}}], []}, validation_fun) do
-    "First" |> IO.inspect(limit: :infinity, label: "")
-
     with validated = %Ecto.Changeset{} <- validation_fun.(child) do
-      "VALIDATED FIRST" |> IO.inspect(limit: :infinity, label: "")
       new_changes = %{parent.changes | field => validated}
       retreat(%{parent | changes: new_changes, valid?: validated.valid?}, [])
     else
@@ -411,10 +406,7 @@ defmodule EctoMorph do
   end
 
   def walk_the_path({[{field, child} | rest = [{_, parent} | _]], []}, validation_fun) do
-    "SECOND" |> IO.inspect(limit: :infinity, label: "")
-
     with validated = %Ecto.Changeset{} <- validation_fun.(child) do
-      "VALIDATED SECOND" |> IO.inspect(limit: :infinity, label: "")
       new_changes = %{parent.changes | field => validated}
       retreat(%{parent | changes: new_changes, valid?: validated.valid?}, rest)
     else
@@ -422,29 +414,17 @@ defmodule EctoMorph do
     end
   end
 
-  # Now parent can be a list when has_many -> it's child / children....
   def walk_the_path({prev_changesets = [{_, parent} | _], [field | rest]}, validation_fun) do
-    "THIRD" |> IO.inspect(limit: :infinity, label: "")
-
     case Map.get(parent.changes, field) do
       nested_changeset = %Ecto.Changeset{} ->
-        "THIRD 1" |> IO.inspect(limit: :infinity, label: "")
         walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
 
       changesets = [%Ecto.Changeset{} | _] ->
-        "LIST OF CHANGE" |> IO.inspect(limit: :infinity, label: "")
-        changesets |> IO.inspect(limit: :infinity, label: "CHCHCHCHCS")
-
         {valid?, changes} =
           Enum.reduce(changesets, {true, []}, fn nested_changeset, {valid, acc} ->
-            # validate_nested_changeset(nested_changeset, rest, validation_fun)
-            result =
-              walk_the_path({[{field, nested_changeset}], rest}, validation_fun)
-              |> IO.inspect(limit: :infinity, label: "RESULT")
-
+            result = walk_the_path({[{field, nested_changeset}], rest}, validation_fun)
             {valid && result.valid?, [result | acc]}
           end)
-          |> IO.inspect(limit: :infinity, label: "NEW CHANGES")
 
         new_changes = %{parent.changes | field => Enum.reverse(changes)}
         %{parent | changes: new_changes, valid?: valid?}
@@ -459,18 +439,15 @@ defmodule EctoMorph do
   end
 
   def retreat(changeset, []) do
-    "RETREAT 1" |> IO.inspect(limit: :infinity, label: "")
     changeset
   end
 
   def retreat(changeset, [{field, _}, {_, parent = %Ecto.Changeset{}}]) do
-    "RETREAT 2" |> IO.inspect(limit: :infinity, label: "")
     new_changes = %{parent.changes | field => changeset}
     %{parent | changes: new_changes, valid?: changeset.valid?}
   end
 
   def retreat(changeset, [{field, _} | rest = [{_, parent} | _]]) do
-    "RETREAT 3" |> IO.inspect(limit: :infinity, label: "")
     new_changes = %{parent.changes | field => changeset}
     retreat(%{parent | changes: new_changes, valid?: changeset.valid?}, rest)
   end

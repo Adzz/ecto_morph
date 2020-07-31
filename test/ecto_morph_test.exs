@@ -1062,12 +1062,24 @@ defmodule EctoMorphTest do
   end
 
   describe "Specifying validation funs" do
-    test "When it is valid, it's all good", %{json: json} do
+    test "Has one, 1 level nested", %{json: json} do
+      # PASS
       result =
         EctoMorph.generate_changeset(json, SchemaUnderTest)
         |> EctoMorph.validate_nested_changeset([:aurora_borealis], fn changeset ->
           changeset
           |> Ecto.Changeset.validate_number(:probability, less_than: 5)
+        end)
+
+      assert result.valid? == true
+      assert result.changes.aurora_borealis.errors == []
+
+      # FAIL
+      result =
+        EctoMorph.generate_changeset(json, SchemaUnderTest)
+        |> EctoMorph.validate_nested_changeset([:aurora_borealis], fn changeset ->
+          changeset
+          |> Ecto.Changeset.validate_number(:probability, greater_than: 5)
         end)
 
       assert result.valid? == true
