@@ -388,7 +388,7 @@ defmodule EctoMorph do
     walk_the_path({[{nil, changeset}], path_to_nested_changeset}, validation_fun)
   end
 
-  def walk_the_path({[{field, parent = %Ecto.Changeset{}}], []}, validation_fun) do
+  def walk_the_path({[{_, parent = %Ecto.Changeset{}}], []}, validation_fun) do
     with validated = %Ecto.Changeset{} <- validation_fun.(parent) do
       validated
     else

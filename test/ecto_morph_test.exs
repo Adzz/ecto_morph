@@ -150,6 +150,7 @@ defmodule EctoMorphTest do
 
     schema "other_table" do
       field(:hen_to_eat, :integer)
+      has_one(:steamed_ham, SteamedHams)
     end
   end
 
@@ -1095,9 +1096,12 @@ defmodule EctoMorphTest do
     test "has one that has one - multi nested schemas" do
       # PASS validation
       result =
-        %{steamed_ham: %{double_nested_schema: %{value: "This is a string"}}}
-        |> EctoMorph.generate_changeset(SchemaUnderTest)
-        |> EctoMorph.validate_nested_changeset([:steamed_ham, :double_nested_schema], & &1)
+        %{has_one: %{steamed_ham: %{double_nested_schema: %{value: "This is a string"}}}}
+        |> EctoMorph.generate_changeset(TableBackedSchema)
+        |> EctoMorph.validate_nested_changeset(
+          [:has_one, :steamed_ham, :double_nested_schema],
+          & &1
+        )
 
       assert result.valid?
 
