@@ -1117,7 +1117,7 @@ defmodule EctoMorphTest do
         EctoMorph.generate_changeset(json, SchemaUnderTest)
         |> EctoMorph.validate_nested_changeset([:steamed_hams], fn changeset ->
           changeset
-          |> Ecto.Changeset.validate_number(:pickles, greater_than: 5)
+          |> Ecto.Changeset.validate_number(:pickles, greater_than: 55)
         end)
 
       assert result.valid? == false
@@ -1137,12 +1137,11 @@ defmodule EctoMorphTest do
     end
 
     test "has_many nested " do
-      # Pass validation
       json = %{
         steamed_hams: [
           %{double_nested_schema: %{value: "Hi"}},
           %{double_nested_schema: %{value: "Hi there"}},
-          %{double_nested_schema: %{value: "Passing validation is easy"}},
+          %{double_nested_schema: %{value: "Passing validation is easy"}}
         ]
       }
 
@@ -1153,6 +1152,21 @@ defmodule EctoMorphTest do
         end)
 
       assert result.valid? == false
+      [first, second, third] = result.changes.steamed_hams
+
+      assert first.changes.double_nested_schema.errors == [
+               {:value,
+                {"should be at least %{count} character(s)",
+                 [count: 15, validation: :length, kind: :min, type: :string]}}
+             ]
+
+      assert second.changes.double_nested_schema.errors == [
+               {:value,
+                {"should be at least %{count} character(s)",
+                 [count: 15, validation: :length, kind: :min, type: :string]}}
+             ]
+
+      assert third.changes.double_nested_schema.errors == []
     end
 
     test "when it's invalid" do

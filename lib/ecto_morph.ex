@@ -389,111 +389,78 @@ defmodule EctoMorph do
   end
 
   def walk_the_path({[{field, child}, {_, parent = %Ecto.Changeset{}}], []}, validation_fun) do
-    if is_list(child) do
-      {valid?, children} =
-        Enum.reduce(child, {true, []}, fn ch, {valid, acc} ->
-          with validated = %Ecto.Changeset{} <- validation_fun.(ch) do
-            {valid && validated.valid?, [validated | acc]}
-          else
-            _ -> raise InvalidValidationFunction
-          end
-        end)
+    "First" |> IO.inspect(limit: :infinity, label: "")
 
-      new_changes = %{parent.changes | field => children}
-      retreat(%{parent | changes: new_changes, valid?: valid?}, [])
+    with validated = %Ecto.Changeset{} <- validation_fun.(child) do
+      "VALIDATED FIRST" |> IO.inspect(limit: :infinity, label: "")
+      new_changes = %{parent.changes | field => validated}
+      retreat(%{parent | changes: new_changes, valid?: validated.valid?}, [])
     else
-      with validated = %Ecto.Changeset{} <- validation_fun.(child) do
-        new_changes = %{parent.changes | field => validated}
-        retreat(%{parent | changes: new_changes, valid?: validated.valid?}, [])
-      else
-        _ -> raise InvalidValidationFunction
-      end
+      _ -> raise InvalidValidationFunction
     end
   end
 
   def walk_the_path({[{field, child} | rest = [{_, parent} | _]], []}, validation_fun) do
-    if is_list(child) do
-      {valid?, children} =
-        Enum.reduce(child, {true, []}, fn ch, {valid, acc} ->
-          with validated = %Ecto.Changeset{} <- validation_fun.(ch) do
-            {valid && validated.valid?, [validated | acc]}
-          else
-            _ -> raise InvalidValidationFunction
-          end
-        end)
+    "SECOND" |> IO.inspect(limit: :infinity, label: "")
 
-      new_changes = %{parent.changes | field => children}
-      retreat(%{parent | changes: new_changes, valid?: valid?}, [])
+    with validated = %Ecto.Changeset{} <- validation_fun.(child) do
+      "VALIDATED SECOND" |> IO.inspect(limit: :infinity, label: "")
+      new_changes = %{parent.changes | field => validated}
+      retreat(%{parent | changes: new_changes, valid?: validated.valid?}, rest)
     else
-      with validated = %Ecto.Changeset{} <- validation_fun.(child) do
-        # Parent is a list.... In which case we want to retreat for every element in the list, then
-        # retreat the list. I think...?
-        if is_list(parent) do
-          Enum.map(parent, fn p ->
-            new_changes = %{p.changes | field => validated}
-            retreat(%{p | changes: new_changes, valid?: validated.valid?}, rest)
-          end)
-          # retreat(%{p | changes: new_changes, valid?: validated.valid?}, rest)
-        else
-          new_changes = %{parent.changes | field => validated}
-          retreat(%{parent | changes: new_changes, valid?: validated.valid?}, rest)
-        end
-      else
-        _ -> raise InvalidValidationFunction
-      end
+      _ -> raise InvalidValidationFunction
     end
   end
 
   # Now parent can be a list when has_many -> it's child / children....
   def walk_the_path({prev_changesets = [{_, parent} | _], [field | rest]}, validation_fun) do
-    # This will be a list if we are validating associations of a has_many. I.e we are validating Z
-    # when X has_many Y has_one (or many) Z
-    if is_list(parent) do
-      # do we just recur here? I think we have to merge these all into a parent somewhere...
-      Enum.map(parent, fn each ->
-        case Map.get(each.changes, field)do
-          nested_changeset = %Ecto.Changeset{} ->
-            walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
+    "THIRD" |> IO.inspect(limit: :infinity, label: "")
 
-          changesets = [%Ecto.Changeset{} | _] ->
-            walk_the_path({[{field, changesets} | prev_changesets], rest}, validation_fun)
+    case Map.get(parent.changes, field) do
+      nested_changeset = %Ecto.Changeset{} ->
+        "THIRD 1" |> IO.inspect(limit: :infinity, label: "")
+        walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
 
-          _ ->
-            raise InvalidPathError, """
-            EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
-            points to a nested changeset. It looks like :#{field} points to a change that isn't a nested
-            changeset, or doesn't exist at all.
-            """
-        end
-      end)
-    else
-      case Map.get(parent.changes, field) do
-        nested_changeset = %Ecto.Changeset{} ->
-          walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
+      changesets = [%Ecto.Changeset{} | _] ->
+        "LIST OF CHANGE" |> IO.inspect(limit: :infinity, label: "")
+        changesets |> IO.inspect(limit: :infinity, label: "CHCHCHCHCS")
 
-        changesets = [%Ecto.Changeset{} | _] ->
-          walk_the_path({[{field, changesets} | prev_changesets], rest}, validation_fun)
+        {valid?, changes} =
+          Enum.reduce(changesets, {true, []}, fn nested_changeset, {valid, acc} ->
+            result =
+              validate_nested_changeset(nested_changeset, rest, validation_fun)
+              # walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
+              |> IO.inspect(limit: :infinity, label: "")
 
-        _ ->
-          raise InvalidPathError, """
-          EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
-          points to a nested changeset. It looks like :#{field} points to a change that isn't a nested
-          changeset, or doesn't exist at all.
-          """
-      end
+            {valid && result.valid?, [result | acc]}
+          end)
+          |> IO.inspect(limit: :infinity, label: "NEW CHANGES")
+
+        new_changes = %{parent.changes | field => Enum.reverse(changes)}
+        %{parent | changes: new_changes, valid?: valid?}
+
+      _ ->
+        raise InvalidPathError, """
+        EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
+        points to a nested changeset. It looks like :#{field} points to a change that isn't a nested
+        changeset, or doesn't exist at all.
+        """
     end
   end
 
   def retreat(changeset, []) do
+    "RETREAT 1" |> IO.inspect(limit: :infinity, label: "")
     changeset
   end
 
   def retreat(changeset, [{field, _}, {_, parent = %Ecto.Changeset{}}]) do
+    "RETREAT 2" |> IO.inspect(limit: :infinity, label: "")
     new_changes = %{parent.changes | field => changeset}
     %{parent | changes: new_changes, valid?: changeset.valid?}
   end
 
   def retreat(changeset, [{field, _} | rest = [{_, parent} | _]]) do
+    "RETREAT 3" |> IO.inspect(limit: :infinity, label: "")
     new_changes = %{parent.changes | field => changeset}
     retreat(%{parent | changes: new_changes, valid?: changeset.valid?}, rest)
   end
