@@ -5,7 +5,6 @@ defmodule EctoMorph.MixProject do
     [
       name: "EctoMorph",
       app: :ecto_morph,
-      licenses: "",
       description: description(),
       version: "0.1.16",
       package: package(),
