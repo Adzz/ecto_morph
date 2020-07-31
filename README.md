@@ -163,7 +163,7 @@ by adding `ecto_morph` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:ecto_morph, "~> 0.1.15"}
+    {:ecto_morph, "~> 0.1.16"}
   ]
 end
 ```

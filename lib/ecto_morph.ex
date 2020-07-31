@@ -380,6 +380,8 @@ defmodule EctoMorph do
   EctoMorph.validate_nested_changeset(changeset, [:nested, :double_nested], &MySchema.validate/1)
   ```
   """
+  # Now the natural question is can we extend this to allow the Repo.preload syntax ? I.e. a tree?
+  # [:this, plus: :this, and: [:also, these: :too]] ? I think the zipper Idea helps that along a lot.
   def validate_nested_changeset(_, [], _) do
     raise InvalidPathError, "You must provide at least one field in the path"
   end
