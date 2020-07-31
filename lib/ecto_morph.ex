@@ -427,9 +427,9 @@ defmodule EctoMorph do
 
         {valid?, changes} =
           Enum.reduce(changesets, {true, []}, fn nested_changeset, {valid, acc} ->
+            # validate_nested_changeset(nested_changeset, rest, validation_fun)
             result =
-              validate_nested_changeset(nested_changeset, rest, validation_fun)
-              # walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
+              walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
               |> IO.inspect(limit: :infinity, label: "")
 
             {valid && result.valid?, [result | acc]}
