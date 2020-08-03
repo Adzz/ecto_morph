@@ -1,6 +1,8 @@
 # EctoMorph
 
-EctoMorph morphs your Ecto capabilities into the s t r a t o s p h e r e !
+EctoMorph morphs your Ecto capabilities into the s t r a t o s p h e r e ! 
+
+Parse incoming data into custom structs, then validate it.
 
 Usually you have to do something like this:
 
@@ -150,7 +152,7 @@ EctoMorph.filter_by_schema_fields(%{"random" => "data", "more" => "fields"}, Tes
 %{"random" => "data"}
 ```
 
-Check out the docs folder for more examples, table of contents below:
+Check out the docs for more examples, table of contents below:
 
 - [Casting data](https://medium.com/@ItizAdz/ecto-cast-ing-sugar-31bddbc62cd7)
 - [Creating a has_one_of relation](https://medium.com/@ItizAdz/creating-a-has-one-of-association-in-ecto-with-ectomorph-3932adb996d9)
