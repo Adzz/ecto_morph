@@ -669,7 +669,7 @@ defmodule EctoMorphTest do
         errors: [],
         data: %SchemaUnderTest{},
         changes: changes
-      } = EctoMorph.generate_changeset(json, SchemaUnderTest)
+      } = EctoMorph.generate_changeset(json, SchemaUnderTest)|> IO.inspect(limit: :infinity, label: "")
 
       [steamed_ham_one, steamed_ham_two] = changes.steamed_hams
 

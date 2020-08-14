@@ -155,6 +155,9 @@ EctoMorph.filter_by_schema_fields(%{"random" => "data", "more" => "fields"}, Tes
 Check out the docs for more examples, table of contents below:
 
 - [Casting data](https://medium.com/@ItizAdz/ecto-cast-ing-sugar-31bddbc62cd7)
+  <!-- I'm pretty sure that what we want here is not the struct, but a nested changeset, so that we can do validations etc -->
+  <!-- that would mean it gets treated more like a relation than it currently does... Meaning you could validate it  -->
+  <!-- as per usual nested schema validation. But can custom types return changesets ?-->
 - [Creating a has_one_of relation](https://medium.com/@ItizAdz/creating-a-has-one-of-association-in-ecto-with-ectomorph-3932adb996d9)
 
 ## Installation
