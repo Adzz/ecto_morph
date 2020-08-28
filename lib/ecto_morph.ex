@@ -417,26 +417,31 @@ defmodule EctoMorph do
   end
 
   def walk_the_path({prev_changesets = [{_, parent} | _], [field | rest]}, validation_fun) do
-    case Map.get(parent.changes, field) do
-      nested_changeset = %Ecto.Changeset{} ->
-        walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
+    # Changes can be empty. In which case no validations need to take place.
+    if map_size(parent.changes) == 0 do
+      parent
+    else
+      case Map.get(parent.changes, field) do
+        nested_changeset = %Ecto.Changeset{} ->
+          walk_the_path({[{field, nested_changeset} | prev_changesets], rest}, validation_fun)
 
-      changesets = [%Ecto.Changeset{} | _] ->
-        {valid?, changes} =
-          Enum.reduce(changesets, {true, []}, fn nested_changeset, {valid, acc} ->
-            result = walk_the_path({[{field, nested_changeset}], rest}, validation_fun)
-            {valid && result.valid?, [result | acc]}
-          end)
+        changesets = [%Ecto.Changeset{} | _] ->
+          {valid?, changes} =
+            Enum.reduce(changesets, {true, []}, fn nested_changeset, {valid, acc} ->
+              result = walk_the_path({[{field, nested_changeset}], rest}, validation_fun)
+              {valid && result.valid?, [result | acc]}
+            end)
 
-        new_changes = %{parent.changes | field => Enum.reverse(changes)}
-        %{parent | changes: new_changes, valid?: valid?}
+          new_changes = %{parent.changes | field => Enum.reverse(changes)}
+          %{parent | changes: new_changes, valid?: valid?}
 
-      _ ->
-        raise InvalidPathError, """
-        EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
-        points to a nested changeset. It looks like :#{field} points to a change that isn't a nested
-        changeset, or doesn't exist at all.
-        """
+        _ ->
+          raise InvalidPathError, """
+          EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
+          points to a nested changeset. It looks like :#{field} points to a change that isn't a nested
+          changeset, or doesn't exist at all.
+          """
+      end
     end
   end
 

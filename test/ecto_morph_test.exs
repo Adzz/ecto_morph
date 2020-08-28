@@ -116,7 +116,7 @@ defmodule EctoMorphTest do
       field(:utc_datetime, :utc_datetime)
       field(:utc_datetime_usec, :utc_datetime_usec)
 
-      embeds_many(:steamed_hams, SteamedHams)
+      embeds_many(:steamed_hams, SteamedHams, on_replace: :delete)
       embeds_one(:steamed_ham, SteamedHams)
       embeds_one(:aurora_borealis, AuroraBorealis)
       field(:custom_type, CustomType)
@@ -669,7 +669,7 @@ defmodule EctoMorphTest do
         errors: [],
         data: %SchemaUnderTest{},
         changes: changes
-      } = EctoMorph.generate_changeset(json, SchemaUnderTest)|> IO.inspect(limit: :infinity, label: "")
+      } = EctoMorph.generate_changeset(json, SchemaUnderTest)
 
       [steamed_ham_one, steamed_ham_two] = changes.steamed_hams
 
@@ -1299,6 +1299,8 @@ defmodule EctoMorphTest do
       end)
     end
 
+
+
     test "invalid validation function", %{json: json} do
       ch = EctoMorph.generate_changeset(json, SchemaUnderTest)
       error_message = "Validation functions are expected to take a changeset and to return one"
@@ -1306,6 +1308,74 @@ defmodule EctoMorphTest do
       assert_raise(EctoMorph.InvalidValidationFunction, error_message, fn ->
         EctoMorph.validate_nested_changeset(ch, [:aurora_borealis], fn _ -> :hi end)
       end)
+    end
+
+    test "Pointing to an empty list is allowed - we want to be able to delete relations" do
+      json = %{"steamed_hams" => []}
+
+      existing = %SchemaUnderTest{
+        id: "1",
+        steamed_hams: [
+          %SteamedHams{id: "1", pickles: 10},
+          %SteamedHams{id: "2", pickles: 12}
+        ]
+      }
+
+      # Pass validation
+      result =
+        EctoMorph.generate_changeset(json, SchemaUnderTest)
+        |> EctoMorph.validate_nested_changeset([:steamed_hams], fn changeset ->
+          changeset
+          |> Ecto.Changeset.validate_number(:pickles, less_than: 5)
+        end)
+
+      # There are not changes (as by default a SchemaUnderTest has no SteamedHams)
+      assert result.valid? == true
+      assert result.changes == %{}
+
+      # Fail validation
+      result =
+        EctoMorph.generate_changeset(json, existing)
+        |> EctoMorph.validate_nested_changeset([:steamed_hams], fn changeset ->
+          changeset
+          # Becuase on_replace is set to delete the changeset is always valid.
+          |> Ecto.Changeset.validate_number(:pickles, greater_than: 55)
+        end)
+
+      assert result.valid? == true
+
+      [first, second] = result.changes.steamed_hams
+      # Becuase on_replace is set to delete the changeset is always valid.
+      assert first.valid? == true
+      assert second.valid? == true
+      assert first.errors == []
+      assert first.action == :replace
+      assert second.action == :replace
+    end
+
+    test "has_one that has_one no changes to validate" do
+      # PASS validation
+      result =
+        %{has_one: %{steamed_ham: %{double_nested_schema: %{value: "This is a string"}}}}
+        |> EctoMorph.generate_changeset(TableBackedSchema)
+        |> EctoMorph.validate_nested_changeset(
+          [:has_one, :steamed_ham, :double_nested_schema],
+          & &1
+        )
+
+      assert result.valid?
+
+      # FAIL validation
+      result =
+        %{steamed_ham: %{double_nested_schema: %{}}}
+        |> EctoMorph.generate_changeset(SchemaUnderTest)
+        |> EctoMorph.validate_nested_changeset([:steamed_ham, :double_nested_schema], fn ch ->
+          Ecto.Changeset.validate_length(ch, :value, min: 50)
+        end)
+
+      assert result.valid? == true
+      assert result.changes.steamed_ham.changes.double_nested_schema.errors == []
+      assert result.changes.steamed_ham.changes.double_nested_schema.changes == %{}
     end
   end
 end
