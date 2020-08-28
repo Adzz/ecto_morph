@@ -1299,8 +1299,6 @@ defmodule EctoMorphTest do
       end)
     end
 
-
-
     test "invalid validation function", %{json: json} do
       ch = EctoMorph.generate_changeset(json, SchemaUnderTest)
       error_message = "Validation functions are expected to take a changeset and to return one"
