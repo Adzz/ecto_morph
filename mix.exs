@@ -6,7 +6,7 @@ defmodule EctoMorph.MixProject do
       name: "EctoMorph",
       app: :ecto_morph,
       description: description(),
-      version: "0.1.16",
+      version: "0.1.17",
       package: package(),
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,

@@ -1,6 +1,6 @@
 # EctoMorph
 
-EctoMorph morphs your Ecto capabilities into the s t r a t o s p h e r e ! 
+EctoMorph morphs your Ecto capabilities into the s t r a t o s p h e r e !
 
 Parse incoming data into custom structs, then validate it.
 
@@ -168,7 +168,7 @@ by adding `ecto_morph` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:ecto_morph, "~> 0.1.16"}
+    {:ecto_morph, "~> 0.1.17"}
   ]
 end
 ```
