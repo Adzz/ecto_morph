@@ -418,6 +418,18 @@ defmodule EctoMorph do
 
   def walk_the_path({prev_changesets = [{_, parent} | _], [field | rest]}, validation_fun) do
     # Changes can be empty. In which case no validations need to take place.
+    schema = parent.data.__struct__
+
+    if not (field in (schema_fields(schema) ++
+                        schema_embeds(schema) ++ schema_associations(schema))) do
+      raise InvalidPathError, """
+      EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
+      points to a nested changeset. It looks like :#{field} is not a field on #{schema}.
+
+      NB: You cannot validate through relations.
+      """
+    end
+
     if map_size(parent.changes) == 0 do
       parent
     else
@@ -435,11 +447,19 @@ defmodule EctoMorph do
           new_changes = %{parent.changes | field => Enum.reverse(changes)}
           %{parent | changes: new_changes, valid?: valid?}
 
+        # If the changes aren't in the changeset, then there is nothing to validate, we can't
+        # validate something that isn't there, and it may be legit to have a changeset validation
+        # run always, but sometimes that change isn't in it. Think of a partial update.
+        # The tradeoff is that it's now a bit easier to pass in an incorrect path and not realize
+        # But... there should be tests for that anyway.
+        nil ->
+          parent
+
         _ ->
           raise InvalidPathError, """
           EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
           points to a nested changeset. It looks like :#{field} points to a change that isn't a nested
-          changeset, or doesn't exist at all.
+          changeset.
           """
       end
     end

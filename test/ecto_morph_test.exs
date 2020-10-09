@@ -1272,18 +1272,26 @@ defmodule EctoMorphTest do
       ch = EctoMorph.generate_changeset(json, SchemaUnderTest)
 
       error_message =
-        "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset\npoints to a nested changeset. It looks like :not_a_field points to a change that isn't a nested\nchangeset, or doesn't exist at all.\n"
+        "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset\npoints to a nested changeset. It looks like :not_a_field is not a field on Elixir.EctoMorphTest.SchemaUnderTest.\n\nNB: You cannot validate through relations.\n"
 
+      # Can we alert people to the fact that the path is incorrect.
+      # More importantly.... Should we???????????
+      # One option is no, just do it right.
+      # Other involve checking the field is in the schema_fields the changeset.?
       assert_raise(EctoMorph.InvalidPathError, error_message, fn ->
         EctoMorph.validate_nested_changeset(ch, [:not_a_field], & &1)
       end)
 
       error_message =
-        "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset\npoints to a nested changeset. It looks like :integer points to a change that isn't a nested\nchangeset, or doesn't exist at all.\n"
+        "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset\npoints to a nested changeset. It looks like :integer points to a change that isn't a nested\nchangeset.\n"
 
+      # Pointing to a change, instead of a changeset
       assert_raise(EctoMorph.InvalidPathError, error_message, fn ->
         EctoMorph.validate_nested_changeset(ch, [:integer], & &1)
       end)
+
+      error_message =
+        "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset\npoints to a nested changeset. It looks like :integer is not a field on Elixir.EctoMorphTest.AuroraBorealis.\n\nNB: You cannot validate through relations.\n"
 
       assert_raise(EctoMorph.InvalidPathError, error_message, fn ->
         EctoMorph.validate_nested_changeset(ch, [:aurora_borealis, :integer], & &1)
@@ -1322,12 +1330,12 @@ defmodule EctoMorphTest do
       # Pass validation
       result =
         EctoMorph.generate_changeset(json, SchemaUnderTest)
-        |> EctoMorph.validate_nested_changeset([:steamed_hams], fn changeset ->
-          changeset
-          |> Ecto.Changeset.validate_number(:pickles, less_than: 5)
-        end)
+        |> EctoMorph.validate_nested_changeset(
+          [:steamed_hams],
+          &Ecto.Changeset.validate_number(&1, :pickles, less_than: 5)
+        )
 
-      # There are not changes (as by default a SchemaUnderTest has no SteamedHams)
+      # There are no changes (as by default a SchemaUnderTest has no SteamedHams)
       assert result.valid? == true
       assert result.changes == %{}
 
@@ -1343,12 +1351,65 @@ defmodule EctoMorphTest do
       assert result.valid? == true
 
       [first, second] = result.changes.steamed_hams
-      # Becuase on_replace is set to delete the changeset is always valid.
+      # Because on_replace is set to delete the changeset is always valid.
       assert first.valid? == true
       assert second.valid? == true
       assert first.errors == []
       assert first.action == :replace
       assert second.action == :replace
+    end
+
+    test " when there are other changes, removing relations works" do
+      # When there are other changes.
+      json = %{"steamed_hams" => [], "integer" => 1}
+
+      # Pass validation
+      result =
+        EctoMorph.generate_changeset(json, SchemaUnderTest)
+        |> EctoMorph.validate_nested_changeset(
+          [:steamed_hams],
+          &Ecto.Changeset.validate_number(&1, :pickles, less_than: 5)
+        )
+
+      # There are no changes (as by default a SchemaUnderTest has no SteamedHams)
+      assert result.valid? == true
+      assert result.changes == %{integer: 1}
+
+      json = %{"steamed_hams" => [], "integer" => 1}
+
+      existing = %SchemaUnderTest{
+        id: "1",
+        steamed_hams: [
+          %SteamedHams{id: "1", pickles: 10},
+          %SteamedHams{id: "2", pickles: 12}
+        ]
+      }
+
+      # Pass validation
+      result =
+        EctoMorph.generate_changeset(json, existing)
+        |> EctoMorph.validate_nested_changeset(
+          [:steamed_hams],
+          &Ecto.Changeset.validate_number(&1, :pickles, less_than: 5)
+        )
+
+      # There are no changes (as by default a SchemaUnderTest has no SteamedHams)
+      assert result.valid? == true
+
+      assert %{
+               integer: 1,
+               steamed_hams: [steamed_changes_1, steamed_changes_2]
+             } = result.changes
+
+      assert steamed_changes_1.changes == %{}
+      assert steamed_changes_1.action == :replace
+      assert steamed_changes_1.valid? == true
+      assert steamed_changes_1.errors == []
+
+      assert steamed_changes_2.changes == %{}
+      assert steamed_changes_2.action == :replace
+      assert steamed_changes_2.valid? == true
+      assert steamed_changes_2.errors == []
     end
 
     test "has_one that has_one no changes to validate" do
