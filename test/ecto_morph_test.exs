@@ -1412,6 +1412,22 @@ defmodule EctoMorphTest do
       assert steamed_changes_2.errors == []
     end
 
+    test "Pointing to an empty list is allowed" do
+      # When there are other changes.
+      json = %{"steamed_hams" => [], "integer" => 1}
+
+      result =
+        EctoMorph.generate_changeset(json, HasMany)
+        |> Ecto.Changeset.put_assoc(:steamed_hams, [])
+        |> EctoMorph.validate_nested_changeset(
+          [:steamed_hams],
+          &Ecto.Changeset.validate_number(&1, :pickles, less_than: 5)
+        )
+
+      assert result.valid? == true
+      assert result.changes == %{steamed_hams: []}
+    end
+
     test "has_one that has_one no changes to validate" do
       # PASS validation
       result =

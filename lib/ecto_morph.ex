@@ -455,6 +455,9 @@ defmodule EctoMorph do
         nil ->
           parent
 
+        [] ->
+          parent
+
         _ ->
           raise InvalidPathError, """
           EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
