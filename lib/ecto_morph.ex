@@ -97,6 +97,30 @@ defmodule EctoMorph do
     |> into_struct
   end
 
+  @spec cast_to_struct!(map | ecto_struct, schema_module) :: okay_struct | error_changeset
+  @spec cast_to_struct!(map | ecto_struct, schema_module, list) :: okay_struct | error_changeset
+
+  @doc """
+  Same as `cast_to_struct/2`, but raises if the data fails casting.
+  """
+  def cast_to_struct!(data = %{__struct__: _}, schema) do
+    Map.from_struct(data) |> cast_to_struct!(schema)
+  end
+
+  def cast_to_struct!(data, schema), do: generate_changeset(data, schema) |> into_struct!()
+
+  @doc """
+  Same as `cast_to_struct/3`, but raises if the data fails casting.
+  """
+  def cast_to_struct!(data = %{__struct__: _}, schema, fields) do
+    Map.from_struct(data) |> cast_to_struct!(schema, fields)
+  end
+
+  def cast_to_struct!(data, schema, fields) do
+    generate_changeset(data, schema, fields)
+    |> into_struct!
+  end
+
   @doc """
   Attempts to update the given Ecto Schema struct with the given data by casting data and merging
   it into the struct. Uses `cast` and changesets to recursively update any nested relations also.
@@ -307,6 +331,15 @@ defmodule EctoMorph do
   @spec into_struct(Ecto.Changeset.t()) :: okay_struct | error_changeset
   def into_struct(changeset = %{valid?: true}), do: {:ok, Ecto.Changeset.apply_changes(changeset)}
   def into_struct(changeset), do: {:error, changeset}
+
+  @doc """
+  Essentially a wrapper around Ecto.Changeset.apply_action! where the action is create.
+  It will create a struct out of a valid changeset and raise in the case of an invalid one.
+  """
+  @spec into_struct!(Ecto.Changeset.t()) :: struct() | no_return
+  def into_struct!(changeset) do
+    Ecto.Changeset.apply_action!(changeset, :create)
+  end
 
   @doc """
   Creates a map out of the Ecto struct, removing the internal ecto fields. Optionally you can remove
