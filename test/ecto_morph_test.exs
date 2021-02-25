@@ -1,170 +1,5 @@
 defmodule EctoMorphTest do
-  use ExUnit.Case
-
-  defmodule A do
-    use Ecto.Schema
-
-    embedded_schema do
-      field(:a, :string)
-      field(:number, :integer)
-    end
-
-    def changeset(changes) do
-      EctoMorph.generate_changeset(changes, __MODULE__)
-      |> Ecto.Changeset.validate_number(:number, greater_than: 5)
-      |> EctoMorph.into_struct()
-      |> case do
-        {:ok, struct} -> {:ok, struct}
-        # this ensures these errors appear as errors on the parent...
-        # Add to the medium Article about this. Or make a part two and also include the API
-        # in ecto morph to specify the validation function.
-        {:error, changeset} -> {:error, changeset.errors}
-      end
-    end
-  end
-
-  defmodule B do
-    use Ecto.Schema
-
-    embedded_schema do
-      field(:a, :string)
-      field(:name, :string)
-    end
-  end
-
-  defmodule CustomType do
-    use Ecto.Type
-    def type, do: :map
-
-    def cast(thing = %{"a" => "b"}) do
-      A.changeset(thing)
-    end
-
-    def cast(thing = %{a: "b"}) do
-      EctoMorph.cast_to_struct(thing, A)
-    end
-
-    def cast(thing = %{"a" => "a"}) do
-      EctoMorph.cast_to_struct(thing, B)
-    end
-
-    def cast(thing = %{a: "a"}) do
-      EctoMorph.cast_to_struct(thing, B)
-    end
-
-    def dump(_), do: raise("This will never be called")
-    def load(_), do: raise("This will never be called")
-  end
-
-  defmodule SchemaWithTimestamps do
-    use Ecto.Schema
-
-    embedded_schema do
-      field(:foo, :string)
-      field(:updated_at, :naive_datetime_usec)
-      field(:inserted_at, :naive_datetime_usec)
-    end
-  end
-
-  defmodule DoubleNestedSchema do
-    use Ecto.Schema
-
-    embedded_schema do
-      field(:value, :string)
-    end
-  end
-
-  defmodule SteamedHams do
-    use Ecto.Schema
-
-    embedded_schema do
-      field(:meat_type, :string)
-      field(:pickles, :integer)
-      field(:sauce_ratio, :decimal)
-      embeds_one(:double_nested_schema, DoubleNestedSchema)
-    end
-  end
-
-  defmodule AuroraBorealis do
-    use Ecto.Schema
-
-    embedded_schema do
-      field(:location, :string)
-      field(:probability, :decimal)
-      field(:actually_a_fire?, :boolean)
-    end
-  end
-
-  defmodule SchemaUnderTest do
-    use Ecto.Schema
-
-    embedded_schema do
-      field(:binary_id, :binary_id)
-      field(:integer, :integer)
-      field(:float, :float)
-      field(:boolean, :boolean)
-      field(:name, :string, default: "Seymour!")
-      field(:binary, :binary)
-      field(:array_of_ints, {:array, :integer})
-      field(:map, :map)
-      field(:map_of_integers, {:map, :integer})
-      field(:percentage, :decimal)
-      field(:date, :date)
-      field(:time, :time)
-      field(:naive_datetime, :naive_datetime)
-      field(:naive_datetime_usec, :naive_datetime_usec)
-      field(:utc_datetime, :utc_datetime)
-      field(:utc_datetime_usec, :utc_datetime_usec)
-
-      embeds_many(:steamed_hams, SteamedHams, on_replace: :delete)
-      embeds_one(:steamed_ham, SteamedHams)
-      embeds_one(:aurora_borealis, AuroraBorealis)
-      field(:custom_type, CustomType)
-    end
-  end
-
-  defmodule NonEctoStruct do
-    defstruct [:integer]
-  end
-
-  defmodule Through do
-    use Ecto.Schema
-
-    schema "through" do
-      field(:rad_level, :integer)
-    end
-  end
-
-  defmodule HasMany do
-    use Ecto.Schema
-
-    schema "newest_table" do
-      field(:geese_to_feed, :integer)
-      has_one(:through, Through)
-      has_many(:steamed_hams, SteamedHams)
-    end
-  end
-
-  defmodule HasOne do
-    use Ecto.Schema
-
-    schema "other_table" do
-      field(:hen_to_eat, :integer)
-      has_one(:steamed_ham, SteamedHams)
-    end
-  end
-
-  defmodule TableBackedSchema do
-    use Ecto.Schema
-
-    schema "test_table" do
-      field(:thing, :string)
-      embeds_one(:aurora_borealis, AuroraBorealis)
-      has_one(:has_one, HasOne)
-      has_many(:has_many, HasMany)
-      has_many(:throughs, through: [:has_many, :through])
-    end
-  end
+  use ExUnit.Case, async: false
 
   setup do
     %{
@@ -226,7 +61,7 @@ defmodule EctoMorphTest do
       assert schema_under_test.naive_datetime == ~N[2000-02-29 00:00:00]
       assert schema_under_test.naive_datetime_usec == ~N[2000-02-29 00:00:00.000000]
       assert schema_under_test.utc_datetime |> DateTime.to_string() == "2019-04-08 14:31:14Z"
-      assert schema_under_test.custom_type == %EctoMorphTest.A{a: "b", id: nil, number: 10}
+      assert schema_under_test.custom_type == %A{a: "b", id: nil, number: 10}
 
       assert schema_under_test.utc_datetime_usec |> DateTime.to_string() ==
                "2019-04-08 14:31:14.366732Z"
@@ -390,15 +225,15 @@ defmodule EctoMorphTest do
       assert schema_under_test.array_of_ints == [1, 2, 3, 4]
 
       assert schema_under_test.steamed_hams == [
-               %EctoMorphTest.SteamedHams{
+               %SteamedHams{
                  double_nested_schema: nil,
                  id: nil,
                  meat_type: nil,
                  pickles: 2,
                  sauce_ratio: nil
                },
-               %EctoMorphTest.SteamedHams{
-                 double_nested_schema: %EctoMorphTest.DoubleNestedSchema{
+               %SteamedHams{
+                 double_nested_schema: %DoubleNestedSchema{
                    id: nil,
                    value: "works!"
                  },
@@ -435,15 +270,15 @@ defmodule EctoMorphTest do
       assert schema_under_test.array_of_ints == [1, 2, 3, 4]
 
       assert schema_under_test.steamed_hams == [
-               %EctoMorphTest.SteamedHams{
+               %SteamedHams{
                  double_nested_schema: nil,
                  id: nil,
                  meat_type: nil,
                  pickles: 2,
                  sauce_ratio: nil
                },
-               %EctoMorphTest.SteamedHams{
-                 double_nested_schema: %EctoMorphTest.DoubleNestedSchema{
+               %SteamedHams{
+                 double_nested_schema: %DoubleNestedSchema{
                    id: nil,
                    value: "works!"
                  },
@@ -476,7 +311,7 @@ defmodule EctoMorphTest do
       assert schema_under_test.naive_datetime == ~N[2000-02-29 00:00:00]
       assert schema_under_test.naive_datetime_usec == ~N[2000-02-29 00:00:00.000000]
       assert schema_under_test.utc_datetime |> DateTime.to_string() == "2019-04-08 14:31:14Z"
-      assert schema_under_test.custom_type == %EctoMorphTest.A{a: "b", id: nil, number: 10}
+      assert schema_under_test.custom_type == %A{a: "b", id: nil, number: 10}
 
       assert schema_under_test.utc_datetime_usec |> DateTime.to_string() ==
                "2019-04-08 14:31:14.366732Z"
@@ -578,7 +413,7 @@ defmodule EctoMorphTest do
       }
 
       message =
-        "could not perform create because changeset is invalid.\n\nErrors\n\n    %{\n      steamed_hams: [\n        %{pickles: [{\"is invalid\", [type: :integer, validation: :cast]}]}\n      ]\n    }\n\nApplied changes\n\n    %{\n      aurora_borealis: %{\n        actually_a_fire?: false,\n        location: \"Kitchen\",\n        probability: #Decimal<0.001>\n      },\n      steamed_hams: [%{meat_type: \"beef\", sauce_ratio: #Decimal<0.5>}]\n    }\n\nParams\n\n    %{\n      \"aurora_borealis\" => %{\n        \"actually_a_fire?\" => false,\n        \"location\" => \"Kitchen\",\n        \"probability\" => \"0.001\"\n      },\n      \"field_to_ignore\" => \"ensures we just ignore fields that are not part of the schema\",\n      \"steamed_hams\" => [\n        %{\"meat_type\" => \"beef\", \"pickles\" => false, \"sauce_ratio\" => \"0.5\"}\n      ]\n    }\n\nChangeset\n\n    #Ecto.Changeset<\n      action: :create,\n      changes: %{\n        aurora_borealis: #Ecto.Changeset<\n          action: :insert,\n          changes: %{\n            actually_a_fire?: false,\n            location: \"Kitchen\",\n            probability: #Decimal<0.001>\n          },\n          errors: [],\n          data: #EctoMorphTest.AuroraBorealis<>,\n          valid?: true\n        >,\n        steamed_hams: [\n          #Ecto.Changeset<\n            action: :insert,\n            changes: %{meat_type: \"beef\", sauce_ratio: #Decimal<0.5>},\n            errors: [pickles: {\"is invalid\", [type: :integer, validation: :cast]}],\n            data: #EctoMorphTest.SteamedHams<>,\n            valid?: false\n          >\n        ]\n      },\n      errors: [],\n      data: #EctoMorphTest.SchemaUnderTest<>,\n      valid?: false\n    >\n"
+        "could not perform create because changeset is invalid.\n\nErrors\n\n    %{\n      steamed_hams: [\n        %{pickles: [{\"is invalid\", [type: :integer, validation: :cast]}]}\n      ]\n    }\n\nApplied changes\n\n    %{\n      aurora_borealis: %{\n        actually_a_fire?: false,\n        location: \"Kitchen\",\n        probability: #Decimal<0.001>\n      },\n      steamed_hams: [%{meat_type: \"beef\", sauce_ratio: #Decimal<0.5>}]\n    }\n\nParams\n\n    %{\n      \"aurora_borealis\" => %{\n        \"actually_a_fire?\" => false,\n        \"location\" => \"Kitchen\",\n        \"probability\" => \"0.001\"\n      },\n      \"field_to_ignore\" => \"ensures we just ignore fields that are not part of the schema\",\n      \"steamed_hams\" => [\n        %{\"meat_type\" => \"beef\", \"pickles\" => false, \"sauce_ratio\" => \"0.5\"}\n      ]\n    }\n\nChangeset\n\n    #Ecto.Changeset<\n      action: :create,\n      changes: %{\n        aurora_borealis: #Ecto.Changeset<\n          action: :insert,\n          changes: %{\n            actually_a_fire?: false,\n            location: \"Kitchen\",\n            probability: #Decimal<0.001>\n          },\n          errors: [],\n          data: #AuroraBorealis<>,\n          valid?: true\n        >,\n        steamed_hams: [\n          #Ecto.Changeset<\n            action: :insert,\n            changes: %{meat_type: \"beef\", sauce_ratio: #Decimal<0.5>},\n            errors: [pickles: {\"is invalid\", [type: :integer, validation: :cast]}],\n            data: #SteamedHams<>,\n            valid?: false\n          >\n        ]\n      },\n      errors: [],\n      data: #SchemaUnderTest<>,\n      valid?: false\n    >\n"
 
       assert_raise(Ecto.InvalidChangesetError, message, fn ->
         EctoMorph.cast_to_struct!(json, SchemaUnderTest)
@@ -599,7 +434,7 @@ defmodule EctoMorphTest do
       }
 
       message =
-        "could not perform create because changeset is invalid.\n\nErrors\n\n    %{\n      aurora_borealis: %{\n        actually_a_fire?: [{\"is invalid\", [type: :boolean, validation: :cast]}]\n      }\n    }\n\nApplied changes\n\n    %{\n      aurora_borealis: %{location: \"Kitchen\", probability: #Decimal<0.001>},\n      steamed_hams: [%{meat_type: \"beef\", pickles: 2, sauce_ratio: #Decimal<0.5>}]\n    }\n\nParams\n\n    %{\n      \"aurora_borealis\" => %{\n        \"actually_a_fire?\" => \"YES\",\n        \"location\" => \"Kitchen\",\n        \"probability\" => \"0.001\"\n      },\n      \"field_to_ignore\" => \"ensures we just ignore fields that are not part of the schema\",\n      \"steamed_hams\" => [\n        %{\"meat_type\" => \"beef\", \"pickles\" => 2, \"sauce_ratio\" => \"0.5\"}\n      ]\n    }\n\nChangeset\n\n    #Ecto.Changeset<\n      action: :create,\n      changes: %{\n        aurora_borealis: #Ecto.Changeset<\n          action: :insert,\n          changes: %{location: \"Kitchen\", probability: #Decimal<0.001>},\n          errors: [\n            actually_a_fire?: {\"is invalid\", [type: :boolean, validation: :cast]}\n          ],\n          data: #EctoMorphTest.AuroraBorealis<>,\n          valid?: false\n        >,\n        steamed_hams: [\n          #Ecto.Changeset<\n            action: :insert,\n            changes: %{meat_type: \"beef\", pickles: 2, sauce_ratio: #Decimal<0.5>},\n            errors: [],\n            data: #EctoMorphTest.SteamedHams<>,\n            valid?: true\n          >\n        ]\n      },\n      errors: [],\n      data: #EctoMorphTest.SchemaUnderTest<>,\n      valid?: false\n    >\n"
+        "could not perform create because changeset is invalid.\n\nErrors\n\n    %{\n      aurora_borealis: %{\n        actually_a_fire?: [{\"is invalid\", [type: :boolean, validation: :cast]}]\n      }\n    }\n\nApplied changes\n\n    %{\n      aurora_borealis: %{location: \"Kitchen\", probability: #Decimal<0.001>},\n      steamed_hams: [%{meat_type: \"beef\", pickles: 2, sauce_ratio: #Decimal<0.5>}]\n    }\n\nParams\n\n    %{\n      \"aurora_borealis\" => %{\n        \"actually_a_fire?\" => \"YES\",\n        \"location\" => \"Kitchen\",\n        \"probability\" => \"0.001\"\n      },\n      \"field_to_ignore\" => \"ensures we just ignore fields that are not part of the schema\",\n      \"steamed_hams\" => [\n        %{\"meat_type\" => \"beef\", \"pickles\" => 2, \"sauce_ratio\" => \"0.5\"}\n      ]\n    }\n\nChangeset\n\n    #Ecto.Changeset<\n      action: :create,\n      changes: %{\n        aurora_borealis: #Ecto.Changeset<\n          action: :insert,\n          changes: %{location: \"Kitchen\", probability: #Decimal<0.001>},\n          errors: [\n            actually_a_fire?: {\"is invalid\", [type: :boolean, validation: :cast]}\n          ],\n          data: #AuroraBorealis<>,\n          valid?: false\n        >,\n        steamed_hams: [\n          #Ecto.Changeset<\n            action: :insert,\n            changes: %{meat_type: \"beef\", pickles: 2, sauce_ratio: #Decimal<0.5>},\n            errors: [],\n            data: #SteamedHams<>,\n            valid?: true\n          >\n        ]\n      },\n      errors: [],\n      data: #SchemaUnderTest<>,\n      valid?: false\n    >\n"
 
       assert_raise(Ecto.InvalidChangesetError, message, fn ->
         EctoMorph.cast_to_struct!(json, SchemaUnderTest)
@@ -623,15 +458,15 @@ defmodule EctoMorphTest do
       assert schema_under_test.array_of_ints == [1, 2, 3, 4]
 
       assert schema_under_test.steamed_hams == [
-               %EctoMorphTest.SteamedHams{
+               %SteamedHams{
                  double_nested_schema: nil,
                  id: nil,
                  meat_type: nil,
                  pickles: 2,
                  sauce_ratio: nil
                },
-               %EctoMorphTest.SteamedHams{
-                 double_nested_schema: %EctoMorphTest.DoubleNestedSchema{
+               %SteamedHams{
+                 double_nested_schema: %DoubleNestedSchema{
                    id: nil,
                    value: "works!"
                  },
@@ -669,15 +504,15 @@ defmodule EctoMorphTest do
       assert schema_under_test.array_of_ints == [1, 2, 3, 4]
 
       assert schema_under_test.steamed_hams == [
-               %EctoMorphTest.SteamedHams{
+               %SteamedHams{
                  double_nested_schema: nil,
                  id: nil,
                  meat_type: nil,
                  pickles: 2,
                  sauce_ratio: nil
                },
-               %EctoMorphTest.SteamedHams{
-                 double_nested_schema: %EctoMorphTest.DoubleNestedSchema{
+               %SteamedHams{
+                 double_nested_schema: %DoubleNestedSchema{
                    id: nil,
                    value: "works!"
                  },
@@ -833,15 +668,15 @@ defmodule EctoMorphTest do
       assert schema_under_test.array_of_ints == [1, 2, 3, 4]
 
       assert schema_under_test.steamed_hams == [
-               %EctoMorphTest.SteamedHams{
+               %SteamedHams{
                  double_nested_schema: nil,
                  id: nil,
                  meat_type: nil,
                  pickles: 2,
                  sauce_ratio: nil
                },
-               %EctoMorphTest.SteamedHams{
-                 double_nested_schema: %EctoMorphTest.DoubleNestedSchema{
+               %SteamedHams{
+                 double_nested_schema: %DoubleNestedSchema{
                    id: nil,
                    value: "works!"
                  },
@@ -875,15 +710,15 @@ defmodule EctoMorphTest do
       assert schema_under_test.array_of_ints == [1, 2, 3, 4]
 
       assert schema_under_test.steamed_hams == [
-               %EctoMorphTest.SteamedHams{
+               %SteamedHams{
                  double_nested_schema: nil,
                  id: nil,
                  meat_type: nil,
                  pickles: 2,
                  sauce_ratio: nil
                },
-               %EctoMorphTest.SteamedHams{
-                 double_nested_schema: %EctoMorphTest.DoubleNestedSchema{
+               %SteamedHams{
+                 double_nested_schema: %DoubleNestedSchema{
                    id: nil,
                    value: "works!"
                  },
@@ -1074,7 +909,7 @@ defmodule EctoMorphTest do
                    action: :insert,
                    changes: %{pickles: 2},
                    errors: [],
-                   data: %EctoMorphTest.SteamedHams{},
+                   data: %SteamedHams{},
                    valid?: true
                  },
                  %Ecto.Changeset{
@@ -1084,13 +919,13 @@ defmodule EctoMorphTest do
                        action: :insert,
                        changes: %{value: "works!"},
                        errors: [],
-                       data: %EctoMorphTest.DoubleNestedSchema{},
+                       data: %DoubleNestedSchema{},
                        valid?: true
                      },
                      pickles: 1
                    },
                    errors: [],
-                   data: %EctoMorphTest.SteamedHams{},
+                   data: %SteamedHams{},
                    valid?: true
                  }
                ]
@@ -1122,7 +957,7 @@ defmodule EctoMorphTest do
                    action: :insert,
                    changes: %{pickles: 2},
                    errors: [],
-                   data: %EctoMorphTest.SteamedHams{},
+                   data: %SteamedHams{},
                    valid?: true
                  },
                  %Ecto.Changeset{
@@ -1132,13 +967,13 @@ defmodule EctoMorphTest do
                        action: :insert,
                        changes: %{value: "works!"},
                        errors: [],
-                       data: %EctoMorphTest.DoubleNestedSchema{},
+                       data: %DoubleNestedSchema{},
                        valid?: true
                      },
                      pickles: 1
                    },
                    errors: [],
-                   data: %EctoMorphTest.SteamedHams{},
+                   data: %SteamedHams{},
                    valid?: true
                  }
                ]
@@ -1265,7 +1100,7 @@ defmodule EctoMorphTest do
         EctoMorph.generate_changeset(%{"date" => "last day of the month"}, SchemaUnderTest)
 
       error =
-        "could not perform create because changeset is invalid.\n\nErrors\n\n    %{date: [{\"is invalid\", [type: :date, validation: :cast]}]}\n\nApplied changes\n\n    %{}\n\nParams\n\n    %{\"date\" => \"last day of the month\"}\n\nChangeset\n\n    #Ecto.Changeset<\n      action: :create,\n      changes: %{},\n      errors: [date: {\"is invalid\", [type: :date, validation: :cast]}],\n      data: #EctoMorphTest.SchemaUnderTest<>,\n      valid?: false\n    >\n"
+        "could not perform create because changeset is invalid.\n\nErrors\n\n    %{date: [{\"is invalid\", [type: :date, validation: :cast]}]}\n\nApplied changes\n\n    %{}\n\nParams\n\n    %{\"date\" => \"last day of the month\"}\n\nChangeset\n\n    #Ecto.Changeset<\n      action: :create,\n      changes: %{},\n      errors: [date: {\"is invalid\", [type: :date, validation: :cast]}],\n      data: #SchemaUnderTest<>,\n      valid?: false\n    >\n"
 
       assert_raise(Ecto.InvalidChangesetError, error, fn ->
         EctoMorph.into_struct!(changeset)
@@ -1570,7 +1405,7 @@ defmodule EctoMorphTest do
       ch = EctoMorph.generate_changeset(json, SchemaUnderTest)
 
       error_message =
-        "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset\npoints to a nested changeset. It looks like :not_a_field is not a field on Elixir.EctoMorphTest.SchemaUnderTest.\n\nNB: You cannot validate through relations.\n"
+        "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset\npoints to a nested changeset. It looks like :not_a_field is not a field on Elixir.SchemaUnderTest.\n\nNB: You cannot validate through relations.\n"
 
       # Can we alert people to the fact that the path is incorrect.
       # More importantly.... Should we???????????
@@ -1589,7 +1424,7 @@ defmodule EctoMorphTest do
       end)
 
       error_message =
-        "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset\npoints to a nested changeset. It looks like :integer is not a field on Elixir.EctoMorphTest.AuroraBorealis.\n\nNB: You cannot validate through relations.\n"
+        "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset\npoints to a nested changeset. It looks like :integer is not a field on Elixir.AuroraBorealis.\n\nNB: You cannot validate through relations.\n"
 
       assert_raise(EctoMorph.InvalidPathError, error_message, fn ->
         EctoMorph.validate_nested_changeset(ch, [:aurora_borealis, :integer], & &1)
