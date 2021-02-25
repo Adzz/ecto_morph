@@ -92,35 +92,6 @@ defmodule AuroraBorealis do
   end
 end
 
-defmodule SchemaUnderTest do
-  use Ecto.Schema
-
-  embedded_schema do
-    field(:binary_id, :binary_id)
-    field(:integer, :integer)
-    field(:float, :float)
-    field(:boolean, :boolean)
-    field(:name, :string, default: "Seymour!")
-    field(:binary, :binary)
-    field(:array_of_ints, {:array, :integer})
-    field(:map, :map)
-    field(:map_of_integers, {:map, :integer})
-    field(:percentage, :decimal)
-    field(:date, :date)
-    field(:time, :time)
-    field(:naive_datetime, :naive_datetime)
-    field(:naive_datetime_usec, :naive_datetime_usec)
-    field(:utc_datetime, :utc_datetime)
-    field(:utc_datetime_usec, :utc_datetime_usec)
-    has_many(:has_many, HasMany)
-    has_many(:throughs, through: [:has_many, :through])
-    embeds_many(:steamed_hams, SteamedHams, on_replace: :delete)
-    embeds_one(:steamed_ham, SteamedHams)
-    embeds_one(:aurora_borealis, AuroraBorealis)
-    field(:custom_type, CustomType)
-  end
-end
-
 defmodule NonEctoStruct do
   defstruct [:integer]
 end
@@ -162,6 +133,35 @@ defmodule TableBackedSchema do
     has_one(:has_one, HasOne)
     has_many(:has_many, HasMany)
     has_many(:throughs, through: [:has_many, :through])
+  end
+end
+
+defmodule SchemaUnderTest do
+  use Ecto.Schema
+
+  embedded_schema do
+    field(:binary_id, :binary_id)
+    field(:integer, :integer)
+    field(:float, :float)
+    field(:boolean, :boolean)
+    field(:name, :string, default: "Seymour!")
+    field(:binary, :binary)
+    field(:array_of_ints, {:array, :integer})
+    field(:map, :map)
+    field(:map_of_integers, {:map, :integer})
+    field(:percentage, :decimal)
+    field(:date, :date)
+    field(:time, :time)
+    field(:naive_datetime, :naive_datetime)
+    field(:naive_datetime_usec, :naive_datetime_usec)
+    field(:utc_datetime, :utc_datetime)
+    field(:utc_datetime_usec, :utc_datetime_usec)
+    has_many(:has_many, HasMany)
+    has_many(:throughs, through: [:has_many, :through])
+    embeds_many(:steamed_hams, SteamedHams, on_replace: :delete)
+    embeds_one(:steamed_ham, SteamedHams)
+    embeds_one(:aurora_borealis, AuroraBorealis)
+    field(:custom_type, CustomType)
   end
 end
 
