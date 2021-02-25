@@ -325,6 +325,69 @@ defmodule EctoMorph do
   end
 
   @doc """
+  Deep filters the data to only include those fields that appear in the given schema and in any of
+  the given schema's relations. If the schema `has_one(:foo, Foo)` and data has `:foo` as an key,
+  then the value under `:foo` in data will be filtered by the fields in Foo. This will happen for
+  all casts, embeds, virtual fields and through associations.
+
+  ### Examples
+
+      iex> deep_filter_by_schema_fields(%{a: "c", ignored: true, stuff: "nope"}, A)
+      %{a: "c"}
+  """
+  def deep_filter_by_schema_fields(data, schema) when is_map(data) do
+    # This does not include through assocs. With them, we would not be able to figure out the schema
+    # they are on... meaning we won't know the fields to filter by so we just return it as is.
+    # (Unless it's a struct then we can?).
+    relations = schema_associations(schema) ++ schema_embeds(schema)
+    # This will include virtual fields, through associations, and normal assocs.
+
+    # If the data is not a map we in trouble. Like if the data's key has a key the same name as
+    # an assoc, but that key doesn't point to a map you gonna have a bad time.
+    Map.take(data, all_schema_fields(schema))
+    |> Enum.into(%{}, fn
+      {key, %Ecto.Association.NotLoaded{} = value} ->
+        {key, value}
+
+      {key, nil} ->
+        {key, nil}
+
+      {key, value} ->
+        # If it is a through relation I don't think we have a way to introspect what schema it
+        # belongs to. Which means we may just have to pass it as is... Which means we don't filter
+        # the fields of the through relation.
+        if key in relations do
+          {_, %{related: relation_schema}} = Map.fetch!(schema.__changeset__(), key)
+
+          if is_list(value) do
+            # Has / embeds many
+            {key, Enum.map(value, &deep_filter_by_schema_fields(&1, relation_schema))}
+          else
+            {key, deep_filter_by_schema_fields(value, relation_schema)}
+          end
+        else
+          # Do we handle non ecto structs as the data being filtered...
+          if key in throughs(schema) do
+            case value do
+              # This essentially tries to work for through relations if it's a struct by
+              # getting the struct schema out of the struct.
+              %{__struct__: relation_schema} = value ->
+                {key, deep_filter_by_schema_fields(value, relation_schema)}
+
+              value when is_list(value) ->
+                {key, Enum.map(value, &deep_filter_by_schema_fields(&1, schema))}
+
+              value ->
+                {key, value}
+            end
+          else
+            {key, value}
+          end
+        end
+    end)
+  end
+
+  @doc """
   Take a changeset and returns a struct if there are no errors on the changeset. Returns an error
   tuple with the invalid changeset otherwise.
   """
@@ -551,12 +614,31 @@ defmodule EctoMorph do
     Ecto.Changeset.cast(current, data, fields)
   end
 
+  # Map.keys(schema.__changeset__()) will include virtual fields and assocs and embeds BUT will
+  # not include through associations. It's a bit weird, but if you want everything you have to mix
+  # and match a bit...
+  defp all_schema_fields(schema) do
+    # If you do this: Map.keys(struct(schema)) -- [:__meta__, :__struct__]
+    # it would work but might cause issues if new private keys are added.
+    (Map.keys(schema.__changeset__()) ++ schema.__schema__(:associations)) |> Enum.uniq()
+  end
+
   defp schema_embeds(schema) do
     schema.__schema__(:embeds)
   end
 
   defp schema_fields(schema) do
     schema.__schema__(:fields)
+  end
+
+  defp throughs(schema) do
+    # __schema__(associations) will include through associations but through assocs aren't
+    # in __changeset__
+    schema.__schema__(:associations)
+    |> Enum.reject(fn assoc ->
+      # If the through assoc is not in the __changeset__ map, then it can go!
+      Map.get(schema.__changeset__(), assoc, false)
+    end)
   end
 
   defp schema_associations(schema) do
