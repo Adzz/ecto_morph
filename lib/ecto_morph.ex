@@ -26,7 +26,7 @@ defmodule EctoMorph do
 
   UNTIL NOW!
 
-  Here we take care of casting the values in the json to the type that the given schema defines, as
+  Here we take care of casting the values in the JSON to the type that the given schema defines, as
   well as turning the string keys into (existing) atoms. (We know they will be existing atoms
   because they will exist in the schema definitions.)
 
@@ -75,15 +75,13 @@ defmodule EctoMorph do
   Accepts a whitelist of fields that you allow updates / inserts on. This list of fields can define
   fields for inner schemas also like so:
 
-  ```elixir
-    EctoMorph.cast_to_struct(json, SchemaUnderTest, [
-      :boolean,
-      :name,
-      :binary,
-      :array_of_ints,
-      steamed_hams: [:pickles, double_nested_schema: [:value]]
-    ])
-  ```
+      EctoMorph.cast_to_struct(json, SchemaUnderTest, [
+        :boolean,
+        :name,
+        :binary,
+        :array_of_ints,
+        steamed_hams: [:pickles, double_nested_schema: [:value]]
+      ])
 
   We filter out any keys that are not defined in the schema, and if the first argument is a struct,
   we call Map.from_struct/1 on it first. This can be useful for converting data between structs.
@@ -153,7 +151,6 @@ defmodule EctoMorph do
 
   ### Examples
 
-  ```elixir
       ...> data = %{
       ...>  "integer" => "77",
       ...>  "steamed_hams" => [%{
@@ -164,7 +161,7 @@ defmodule EctoMorph do
       ...> }
       ...> EctoMorph.generate_changeset(data, %SchemaUnderTest{integer: 2})
       ...>
-  ```
+
   """
   @spec generate_changeset(map() | ecto_struct, schema_module | ecto_struct) :: Ecto.Changeset.t()
   def generate_changeset(data = %{__struct__: _}, schema) do
@@ -190,7 +187,7 @@ defmodule EctoMorph do
 
   If we provide a whitelist of fields, we will be passed a changeset for the changes on those fields
   only:
-  ```elixir
+
       ...> data = %{
       ...>  "integer" => "77",
       ...>  "steamed_hams" => [%{
@@ -201,10 +198,9 @@ defmodule EctoMorph do
       ...> }
       ...> EctoMorph.generate_changeset(data, SchemaUnderTest, [:integer])
       ...>
-  ```
 
   We can also define whitelists for any arbitrarily deep relation like so:
-  ```elixir
+
       ...> data = %{
       ...>  "integer" => "77",
       ...>  "steamed_hams" => [%{
@@ -217,7 +213,7 @@ defmodule EctoMorph do
       ...>   :integer,
       ...>   steamed_hams: [:pickles, double_nested_schema: [:value]]
       ...> ])
-  ```
+
   """
   @spec generate_changeset(map(), schema_module | ecto_struct, list) :: Ecto.Changeset.t()
   def generate_changeset(data = %{__struct__: _}, schema_or_existing_struct, fields) do
@@ -308,6 +304,7 @@ defmodule EctoMorph do
       iex> filter_by_schema_fields(%{id: 1}, MySchema, [:include_assocs])
       iex> filter_by_schema_fields(%{id: 2}, MySchema, [:include_embeds])
       iex> filter_by_schema_fields(%{id: 3}, MySchema, [include_assocs, :include_embeds])
+
   """
   @spec filter_by_schema_fields(map(), schema_module, list()) :: map()
   def filter_by_schema_fields(data, schema, options \\ []) do
@@ -418,6 +415,7 @@ defmodule EctoMorph do
 
       iex> map_from_struct(%Test{}, [:exclude_timestamps, :exclude_id])
       %Test{foo: "bar"}
+
   """
   @spec map_from_struct(ecto_struct) :: map()
   @spec map_from_struct(ecto_struct, list()) :: map()
@@ -466,15 +464,14 @@ defmodule EctoMorph do
 
   ### Examples
 
-  ```elixir
-  EctoMorph.generate_changeset(%{nested: %{foo: 3}})
-  |> EctoMorph.validate_nested_changeset([:nested], fn changeset ->
-    Ecto.Changeset.validate_number(changeset, :foo, greater_than: 5)
-  end)
+      EctoMorph.generate_changeset(%{nested: %{foo: 3}})
+      |> EctoMorph.validate_nested_changeset([:nested], fn changeset ->
+        Ecto.Changeset.validate_number(changeset, :foo, greater_than: 5)
+      end)
 
-  changeset = EctoMorph.generate_changeset(%{nested: %{double_nested: %{field: 6}}})
-  EctoMorph.validate_nested_changeset(changeset, [:nested, :double_nested], &MySchema.validate/1)
-  ```
+      changeset = EctoMorph.generate_changeset(%{nested: %{double_nested: %{field: 6}}})
+      EctoMorph.validate_nested_changeset(changeset, [:nested, :double_nested], &MySchema.validate/1)
+
   """
   # Now the natural question is can we extend this to allow the Repo.preload syntax ? I.e. a tree?
   # [:this, plus: :this, and: [:also, these: :too]] ? I think the zipper Idea helps that along a lot.

@@ -1,5 +1,10 @@
 # EctoMorph
 
+[![hex.pm](https://img.shields.io/hexpm/v/ecto_morph.svg)](https://hex.pm/packages/ecto_morph)
+[![hex.pm](https://img.shields.io/hexpm/dt/ecto_morph.svg)](https://hex.pm/packages/ecto_morph)
+[![hex.pm](https://img.shields.io/hexpm/l/ecto_morph.svg)](https://hex.pm/packages/ecto_morph)
+[![github.com](https://img.shields.io/github/last-commit/Adzz/ecto_morph.svg)](https://github.com/Adzz/ecto_morph)
+
 EctoMorph morphs your Ecto capabilities into the s t r a t o s p h e r e !
 
 Parse incoming data into custom structs, then validate it.
@@ -30,25 +35,31 @@ Ecto.Changeset.cast(%Test{}, %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, [
 Now we can do this:
 
 ```elixir
-EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test)
+EctoMorph.cast_to_struct(
+  %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test)
 
 # or
 
-EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing, embed: [:bar]])
+EctoMorph.cast_to_struct(
+  %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing, embed: [:bar]])
 
 # The data can also be a struct so this would work:
-EctoMorph.cast_to_struct(%Test{thing: "foo", embed: %Embed{bar: "baz"}}, Test, [:thing, embed: [:bar]])
+EctoMorph.cast_to_struct(
+  %Test{thing: "foo", embed: %Embed{bar: "baz"}}, Test, [:thing, embed: [:bar]])
 
 # So would this:
-EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, %Test{}, [:thing, embed: [:bar]])
+EctoMorph.cast_to_struct(
+  %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, %Test{}, [:thing, embed: [:bar]])
 
-# Changes can even be a different struct, if it has overlapping keys they will be casted as expected:
+# Changes can even be a different struct, if it has overlapping keys they will
+be casted as expected:
 
 defmoule OtherStruct do
   defstruct [:thing, :embed]
 end
 
-EctoMorph.cast_to_struct(%OtherStruct{thing: "foo", embed: %{"bar"=> "baz"}}, %Test{}, [:thing, embed: [:bar]])
+EctoMorph.cast_to_struct(
+  %OtherStruct{thing: "foo", embed: %{"bar"=> "baz"}}, %Test{}, [:thing, embed: [:bar]])
 ```
 
 Or something like this:
@@ -63,11 +74,14 @@ end
 We can also whitelist fields to cast / update:
 
 ```elixir
-EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing])
-EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing, embed: [:bar]])
+EctoMorph.cast_to_struct(
+  %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing])
+EctoMorph.cast_to_struct(
+  %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing, embed: [:bar]])
 ```
 
-Sometimes it makes sense to update a struct we have retrieved from the database with data from our response. We can do that like so:
+Sometimes it makes sense to update a struct we have retrieved from the database
+with data from our response. We can do that like so:
 
 ```elixir
 def update(data) do
@@ -98,7 +112,11 @@ Often you'll want to do some validations, that's easy:
 
 ### Valiating Nested Changesets
 
-Easily the coolest feature, say you have nested changesets via embeds or has_one/many, you can now specify a path to a changeset and specify a validation function for the changeset(s) at the end of that path. If your path ends at a list of changesets (because your model has a has_many relation for example), each of those changesets will be validated.
+Easily the coolest feature, say you have nested changesets via embeds or
+has_one/many, you can now specify a path to a changeset and specify a
+validation function for the changeset(s) at the end of that path. If your path
+ends at a list of changesets (because your model has a has_many relation for
+example), each of those changesets will be validated.
 
 ```elixir
 %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
@@ -115,7 +133,6 @@ json = %{
 }
 
 # Here each of the steamed_hams above will have their pickle count validated:
-
 EctoMorph.generate_changeset(json, MySchema)
 |> EctoMorph.validate_nested_changeset([:has_many, :steamed_hams], fn changeset ->
   changeset
@@ -124,7 +141,8 @@ end)
 ```
 
 
-Other abilities include creating a map from an ecto struct, dropping optional fields if you decide to:
+Other abilities include creating a map from an ecto struct, dropping optional
+fields if you decide to:
 
 ```elixir
 EctoMorph.map_from_struct(%Test{})
@@ -137,7 +155,7 @@ EctoMorph.map_from_struct(%Test{}, [:exclude_timestamps, :exclude_id])
 %{foo: "bar"}
 ```
 
-and being able to filter some data by the fields in the given schema:
+And being able to filter some data by the fields in the given schema:
 
 ```elixir
 defmodule Test do
@@ -154,16 +172,17 @@ EctoMorph.filter_by_schema_fields(%{"random" => "data", "more" => "fields"}, Tes
 
 Check out the docs for more examples, table of contents below:
 
+<!-- I'm pretty sure that what we want here is not the struct, but a nested changeset, so that we can do validations etc -->
+<!-- that would mean it gets treated more like a relation than it currently does... Meaning you could validate it  -->
+<!-- as per usual nested schema validation. But can custom types return changesets ?-->
+
 - [Casting data](https://medium.com/@ItizAdz/ecto-cast-ing-sugar-31bddbc62cd7)
-  <!-- I'm pretty sure that what we want here is not the struct, but a nested changeset, so that we can do validations etc -->
-  <!-- that would mean it gets treated more like a relation than it currently does... Meaning you could validate it  -->
-  <!-- as per usual nested schema validation. But can custom types return changesets ?-->
 - [Creating a has_one_of relation](https://medium.com/@ItizAdz/creating-a-has-one-of-association-in-ecto-with-ectomorph-3932adb996d9)
 
 ## Installation
 
-[available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `ecto_morph` to your list of dependencies in `mix.exs`:
+The package can be installed by adding `ecto_morph` to your list of
+dependencies in `mix.exs`:
 
 ```elixir
 def deps do
@@ -173,6 +192,5 @@ def deps do
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/ecto_morph](https://hexdocs.pm/ecto_morph).
+Additional docs can be found at
+[https://hexdocs.pm/ecto_morph](https://hexdocs.pm/ecto_morph).
