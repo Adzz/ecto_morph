@@ -25,7 +25,7 @@ defmodule EctoMorph.MixProject do
   defp deps do
     [
       {:ecto, ">= 3.0.3"},
-      {:ex_doc, "~> 0.19", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.19", only: :docs, runtime: false}
     ]
   end
 
