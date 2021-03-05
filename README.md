@@ -30,41 +30,48 @@ Ecto.Changeset.cast(%Test{}, %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, [
 Now we can do this:
 
 ```elixir
-EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test)
+data = %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
+EctoMorph.cast_to_struct(data, Test)
 
 # or
-
-EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing, embed: [:bar]])
+data = %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
+EctoMorph.cast_to_struct(data, Test, [:thing, embed: [:bar]])
 
 # The data can also be a struct so this would work:
-EctoMorph.cast_to_struct(%Test{thing: "foo", embed: %Embed{bar: "baz"}}, Test, [:thing, embed: [:bar]])
+data = %Test{thing: "foo", embed: %Embed{bar: "baz"}}
+EctoMorph.cast_to_struct(data, Test, [:thing, embed: [:bar]])
 
 # So would this:
-EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, %Test{}, [:thing, embed: [:bar]])
+data = %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
+EctoMorph.cast_to_struct(data, %Test{}, [:thing, embed: [:bar]])
 
-# Changes can even be a different struct, if it has overlapping keys they will be casted as expected:
+# Changes can even be a different struct, if it 
+# has overlapping keys they will be casted as expected:
 
 defmoule OtherStruct do
   defstruct [:thing, :embed]
 end
 
-EctoMorph.cast_to_struct(%OtherStruct{thing: "foo", embed: %{"bar"=> "baz"}}, %Test{}, [:thing, embed: [:bar]])
+data = %OtherStruct{thing: "foo", embed: %{"bar"=> "baz"}}
+EctoMorph.cast_to_struct(data, %Test{}, [:thing, embed: [:bar]])
 ```
 
 Or something like this:
 
 ```elixir
 with {:ok, %{status: 200, body: body}} <- HTTPoison.get("mygreatapi.co.uk") do
-  Jason.decode!(body)
-  |> EctoMorph.cast_to_struct(User)
+  EctoMorph.cast_to_struct(Jason.decode!(body), User)
 end
 ```
 
 We can also whitelist fields to cast / update:
 
 ```elixir
-EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing])
-EctoMorph.cast_to_struct(%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}, Test, [:thing, embed: [:bar]])
+data = %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
+EctoMorph.cast_to_struct(data, Test, [:thing])
+
+data = %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
+EctoMorph.cast_to_struct(data, Test, [:thing, embed: [:bar]])
 ```
 
 Sometimes it makes sense to update a struct we have retrieved from the database with data from our response. We can do that like so:
@@ -83,17 +90,20 @@ end
 Often you'll want to do some validations, that's easy:
 
 ```elixir
-%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
-|> EctoMorph.generate_changeset(Test, [:thing])
-|> Ecto.Changeset.validate_required([:thing])
-|> EctoMorph.into_struct()
+(
+  %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
+  |> EctoMorph.generate_changeset(Test, [:thing])
+  |> Ecto.Changeset.validate_required([:thing])
+  |> EctoMorph.into_struct()
+)
 
 # or
-
-%{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
-|> EctoMorph.generate_changeset(Test, [:thing])
-|> Ecto.Changeset.validate_change(...)
-|> Repo.insert!
+(
+  %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
+  |> EctoMorph.generate_changeset(Test, [:thing])
+  |> Ecto.Changeset.validate_change(...)
+  |> Repo.insert!
+)
 ```
 
 ### Valiating Nested Changesets
@@ -118,8 +128,7 @@ json = %{
 
 EctoMorph.generate_changeset(json, MySchema)
 |> EctoMorph.validate_nested_changeset([:has_many, :steamed_hams], fn changeset ->
-  changeset
-  |> Ecto.Changeset.validate_number(:pickles, greater_than: 3)
+  Ecto.Changeset.validate_number(changeset, :pickles, greater_than: 3)
 end)
 ```
 
@@ -148,17 +157,43 @@ defmodule Test do
   end
 end
 
-EctoMorph.filter_by_schema_fields(%{"random" => "data", "more" => "fields"}, Test)
-%{"random" => "data"}
+EctoMorph.filter_by_schema_fields(%{random: "data", more: "fields"}, Test)
+%{random: "data"}
 ```
 
-Check out the docs for more examples, table of contents below:
+You can even deep filter:
 
-- [Casting data](https://medium.com/@ItizAdz/ecto-cast-ing-sugar-31bddbc62cd7)
-  <!-- I'm pretty sure that what we want here is not the struct, but a nested changeset, so that we can do validations etc -->
-  <!-- that would mean it gets treated more like a relation than it currently does... Meaning you could validate it  -->
-  <!-- as per usual nested schema validation. But can custom types return changesets ?-->
-- [Creating a has_one_of relation](https://medium.com/@ItizAdz/creating-a-has-one-of-association-in-ecto-with-ectomorph-3932adb996d9)
+```elixir
+
+defmodule OtherThing do
+  use Ecto.Schema
+  @primary_key false
+  embedded_schema do
+    field(:id, :integer)
+  end
+end
+
+defmodule Test do
+  use Ecto.Schema
+
+  embedded_schema do
+    field(:random, :string)
+    embeds_one(:other_thing, OtherThing)
+  end
+end
+
+data = %{
+  random: "data",
+  more: "fields",
+  __meta__: "stuff", 
+  other_thing: %{id: 1, ignored: "field"}
+}
+
+EctoMorph.deep_filter_by_schema_fields(data, Test)
+%{random: "data", other_thing: %{id: 1}}
+```
+
+Check out the [docs](https://hexdocs.pm/ecto_morph) for more examples and specifics
 
 ## Installation
 
