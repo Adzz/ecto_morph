@@ -193,6 +193,20 @@ EctoMorph.deep_filter_by_schema_fields(data, Test)
 %{random: "data", other_thing: %{id: 1}}
 ```
 
+Deep filtering will keep virtual fields, relations and through relations. That means you can use it to create a map of the struct fields without ecto metadata if you filter it by itself:
+
+```elixir
+data = %Test{
+  random: "data",
+  more: "fields",
+  __meta__: "stuff", 
+  other_thing: %OtherThing{id: 1, ignored: "field"}
+}
+
+EctoMorph.deep_filter_by_schema_fields(data, Test)
+%{random: "data", other_thing: %{id: 1}}
+```
+
 Check out the [docs](https://hexdocs.pm/ecto_morph) for more examples and specifics
 
 ## Installation
