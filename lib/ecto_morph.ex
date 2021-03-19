@@ -497,7 +497,10 @@ defmodule EctoMorph do
   def walk_the_path({[{field, child}, {_, parent = %Ecto.Changeset{}}], []}, validation_fun) do
     with validated = %Ecto.Changeset{} <- validation_fun.(child) do
       new_changes = %{parent.changes | field => validated}
-      retreat(%{parent | changes: new_changes, valid?: validated.valid?}, [])
+      # If the parent is invalid then it needs to stay that way even if the child is valid.
+      # So we want to make the parent invalid if the child was invalid, but otherwise let
+      # it be whatever the parent already was.
+      retreat(%{parent | changes: new_changes, valid?: parent.valid? && validated.valid?}, [])
     else
       _ -> raise InvalidValidationFunction
     end
@@ -506,7 +509,8 @@ defmodule EctoMorph do
   def walk_the_path({[{field, child} | rest = [{_, parent} | _]], []}, validation_fun) do
     with validated = %Ecto.Changeset{} <- validation_fun.(child) do
       new_changes = %{parent.changes | field => validated}
-      retreat(%{parent | changes: new_changes, valid?: validated.valid?}, rest)
+      valid? = parent.valid? && validated.valid?
+      retreat(%{parent | changes: new_changes, valid?: valid?}, rest)
     else
       _ -> raise InvalidValidationFunction
     end
@@ -535,7 +539,7 @@ defmodule EctoMorph do
 
         changesets = [%Ecto.Changeset{} | _] ->
           {valid?, changes} =
-            Enum.reduce(changesets, {true, []}, fn nested_changeset, {valid, acc} ->
+            Enum.reduce(changesets, {parent.valid?, []}, fn nested_changeset, {valid, acc} ->
               result = walk_the_path({[{field, nested_changeset}], rest}, validation_fun)
               {valid && result.valid?, [result | acc]}
             end)
@@ -570,12 +574,14 @@ defmodule EctoMorph do
 
   def retreat(changeset, [{field, _}, {_, parent = %Ecto.Changeset{}}]) do
     new_changes = %{parent.changes | field => changeset}
-    %{parent | changes: new_changes, valid?: changeset.valid?}
+    valid? = changeset.valid? && parent.valid?
+    %{parent | changes: new_changes, valid?: valid?}
   end
 
   def retreat(changeset, [{field, _} | rest = [{_, parent} | _]]) do
     new_changes = %{parent.changes | field => changeset}
-    retreat(%{parent | changes: new_changes, valid?: changeset.valid?}, rest)
+    valid? = changeset.valid? && parent.valid?
+    retreat(%{parent | changes: new_changes, valid?: valid?}, rest)
   end
 
   defp cast_embeds(changeset, relations) do

@@ -40,6 +40,22 @@ defmodule EctoMorph.ValidateNestedChangesetTest do
     }
   end
 
+  test "an already invalid changeset remains invalid" do
+    # PASS
+    data = %{integer: false, aurora_borealis: %{probability: 4}}
+
+    result =
+      EctoMorph.generate_changeset(data, SchemaUnderTest)
+      |> EctoMorph.validate_nested_changeset([:aurora_borealis], fn changeset ->
+        changeset
+        |> Ecto.Changeset.validate_number(:probability, less_than: 5)
+      end)
+
+    assert result.valid? == false
+    assert result.errors == [integer: {"is invalid", [type: :integer, validation: :cast]}]
+    assert result.changes.aurora_borealis.errors == []
+  end
+
   test "Has one, 1 level nested", %{json: json} do
     # PASS
     result =
@@ -221,6 +237,26 @@ defmodule EctoMorph.ValidateNestedChangesetTest do
     assert ham_4.errors == []
     assert ham_5.valid?
     assert ham_5.errors == []
+
+    # An already invalid changeset remains so if children are valid
+    json = %{
+      "thing" => false,
+      "throughs" => %{"rad_level" => 16},
+      "has_many" => [
+        %{"steamed_hams" => [%{"pickles" => 6}, %{"pickles" => 6}]},
+        %{"steamed_hams" => [%{"pickles" => 6}]},
+        %{"steamed_hams" => [%{"pickles" => 6}, %{"pickles" => 6}]}
+      ]
+    }
+
+    result =
+      EctoMorph.generate_changeset(json, TableBackedSchema)
+      |> EctoMorph.validate_nested_changeset([:has_many, :steamed_hams], fn changeset ->
+        Ecto.Changeset.validate_number(changeset, :pickles, greater_than: 3)
+      end)
+
+    assert result.valid? == false
+    assert result.errors == [thing: {"is invalid", [type: :string, validation: :cast]}]
   end
 
   test "when it's invalid" do
@@ -405,6 +441,15 @@ defmodule EctoMorph.ValidateNestedChangesetTest do
   end
 
   test "has_one that has_one no changes to validate" do
+    # when invalid changeset gets validated we remain invalid
+    result =
+      %{thing: false,has_one: %{steamed_ham: %{double_nested_schema: %{value: "This is a string"}}}}
+      |> EctoMorph.generate_changeset(TableBackedSchema)
+      |> EctoMorph.validate_nested_changeset([:has_one, :steamed_ham, :double_nested_schema], & &1)
+
+    assert result.valid? == false
+    assert result.errors == [{:thing, {"is invalid", [type: :string, validation: :cast]}}]
+
     # PASS validation
     result =
       %{has_one: %{steamed_ham: %{double_nested_schema: %{value: "This is a string"}}}}
