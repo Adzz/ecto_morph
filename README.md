@@ -45,7 +45,7 @@ EctoMorph.cast_to_struct(data, Test, [:thing, embed: [:bar]])
 data = %{"thing" => "foo", "embed" => %{"bar"=> "baz"}}
 EctoMorph.cast_to_struct(data, %Test{}, [:thing, embed: [:bar]])
 
-# Changes can even be a different struct, if it 
+# Changes can even be a different struct, if it
 # has overlapping keys they will be casted as expected:
 
 defmoule OtherStruct do
@@ -185,7 +185,7 @@ end
 data = %{
   random: "data",
   more: "fields",
-  __meta__: "stuff", 
+  __meta__: "stuff",
   other_thing: %{id: 1, ignored: "field"}
 }
 
@@ -199,7 +199,7 @@ Deep filtering will keep virtual fields, relations and through relations. That m
 data = %Test{
   random: "data",
   more: "fields",
-  __meta__: "stuff", 
+  __meta__: "stuff",
   other_thing: %OtherThing{id: 1, ignored: "field"}
 }
 
@@ -217,7 +217,7 @@ by adding `ecto_morph` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:ecto_morph, "~> 0.1.22"}
+    {:ecto_morph, "~> 0.1.23"}
   ]
 end
 ```
