@@ -443,9 +443,15 @@ defmodule EctoMorph.ValidateNestedChangesetTest do
   test "has_one that has_one no changes to validate" do
     # when invalid changeset gets validated we remain invalid
     result =
-      %{thing: false,has_one: %{steamed_ham: %{double_nested_schema: %{value: "This is a string"}}}}
+      %{
+        thing: false,
+        has_one: %{steamed_ham: %{double_nested_schema: %{value: "This is a string"}}}
+      }
       |> EctoMorph.generate_changeset(TableBackedSchema)
-      |> EctoMorph.validate_nested_changeset([:has_one, :steamed_ham, :double_nested_schema], & &1)
+      |> EctoMorph.validate_nested_changeset(
+        [:has_one, :steamed_ham, :double_nested_schema],
+        & &1
+      )
 
     assert result.valid? == false
     assert result.errors == [{:thing, {"is invalid", [type: :string, validation: :cast]}}]
