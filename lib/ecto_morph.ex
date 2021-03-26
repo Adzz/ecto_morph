@@ -302,26 +302,32 @@ defmodule EctoMorph do
   end
 
   @doc """
-  Returns a map of all of the schema fields contained within data, optionally includes associations
-  and embeds like so:
+  Returns a map of all of the schema fields contained within data. This is not recursive so look
+  at deep_filter_by_schema_fields if you want a recursive version.
 
-      iex> filter_by_schema_fields(%{id: 1}, MySchema, [:include_assocs])
-      iex> filter_by_schema_fields(%{id: 2}, MySchema, [:include_embeds])
-      iex> filter_by_schema_fields(%{id: 3}, MySchema, [include_assocs, :include_embeds])
+  ### Options
+
+    * filter_not_loaded - This will nillify any Ecto.Association.NotLoaded structs in the map,
+                          setting the value to be nil for any non loaded association.
+
+      iex> data = %{id: 1, other: %Ecto.Association.NotLoaded{}}
+      ...> filter_by_schema_fields(data, MySchema, filter_not_loaded: true)
+      %{id: 1, other: nil}
+
+      iex> data = %{id: 1, other: %AnotherOne{}}
+      ...> filter_by_schema_fields(data, MySchema)
+      %{id: 1, other: %AnotherOne{}}
   """
   @spec filter_by_schema_fields(map(), schema_module, list()) :: map()
-  def filter_by_schema_fields(data, schema, options \\ []) do
-    options_mapping = %{
-      :include_assocs => schema_associations(schema),
-      :include_embeds => schema_embeds(schema)
-    }
+  def filter_by_schema_fields(data, schema, opts \\ []) do
+    filter? = Keyword.get(opts, :filter_not_loaded, false)
 
-    fields =
-      Enum.reduce(options, schema_fields(schema), fn option, acc ->
-        acc ++ Map.get(options_mapping, option, [])
-      end)
-
-    Map.take(data, fields)
+    Map.take(data, all_schema_fields(schema))
+    |> Enum.into(%{}, fn
+      {key, %Ecto.Association.NotLoaded{} = v} -> if filter?, do: {key, nil}, else: {key, v}
+      {key, nil} -> {key, nil}
+      {key, value} -> {key, value}
+    end)
   end
 
   @doc """
@@ -347,6 +353,10 @@ defmodule EctoMorph do
 
       iex> deep_filter_by_schema_fields(%{a: "c", ignored: true, stuff: "nope"}, A)
       %{a: "c"}
+
+      iex> data = %{relation: %Ecto.Association.NotLoaded{}}
+      ...> deep_filter_by_schema_fields(data, A, filter_not_loaded: true)
+      %{relation: nil}
   """
   def deep_filter_by_schema_fields(data, schema, opts \\ []) when is_map(data) do
     filter_not_loaded = Keyword.get(opts, :filter_not_loaded, false)
@@ -358,8 +368,6 @@ defmodule EctoMorph do
 
     Map.take(data, all_schema_fields(schema))
     |> Enum.into(%{}, fn
-      # Is this the correct way to handle these... Or should we nillify them. Or remove
-      # the key completely? Nilify it I guess.
       {key, %Ecto.Association.NotLoaded{} = value} ->
         if filter_not_loaded do
           {key, nil}
@@ -441,7 +449,6 @@ defmodule EctoMorph do
   """
   @spec map_from_struct(ecto_struct) :: map()
   @spec map_from_struct(ecto_struct, list()) :: map()
-  @deprecated "Use deep_filter_by_schema_fields/2 instead"
   def map_from_struct(struct, options \\ []) do
     mapping = %{
       :exclude_timestamps => [:inserted_at, :updated_at],
@@ -637,29 +644,29 @@ defmodule EctoMorph do
     end)
   end
 
-  @doc """
-  Validates whether a changeset has a the relations specified in path_to_relation.
+  # @doc """
+  # Validates whether a changeset has a the relations specified in path_to_relation.
 
-  This follows the semantics of Ecto.Changeset.validate_required and will check changes for a
-  non null relation, then check data. If either are non null the validation will pass allowing
-  the possibility for partial updates.
+  # This follows the semantics of Ecto.Changeset.validate_required and will check changes for a
+  # non null relation, then check data. If either are non null the validation will pass allowing
+  # the possibility for partial updates.
 
-  The path to the relation can be deep. If a relation of a relation is specified as required, then
-  so will the relation be.
+  # The path to the relation can be deep. If a relation of a relation is specified as required, then
+  # so will the relation be.
 
-  ### Examples
+  # ### Examples
 
-    EctoMorph.generate_changeset(%{my: :data, relation: %{}}, MyModule)
-    |> EctoMorph.validate_required_relation([:relation])
+  #   EctoMorph.generate_changeset(%{my: :data, relation: %{}}, MyModule)
+  #   |> EctoMorph.validate_required_relation([:relation])
 
-    EctoMorph.generate_changeset(%{my: :data, relation: %{nested_thing: %{}}}, MyModule)
-    |> EctoMorph.validate_required_relation([relation: :nested_thing])
-  """
-  def validate_required_relation(changeset, path_to_relation) do
+  #   EctoMorph.generate_changeset(%{my: :data, relation: %{nested_thing: %{}}}, MyModule)
+  #   |> EctoMorph.validate_required_relation([relation: :nested_thing])
+  # """
+  # def validate_required_relation(changeset, path_to_relation) do
     # We can use this probably:
     # I think the first arg is from schema.__changeset__[:relation_name] or something.
     # Ecto.Changeset.Relation.empty?()
-  end
+  # end
 
   # # From Ecto sauce:
   # defp missing_relation(%{changes: changes, errors: errors} = changeset,
