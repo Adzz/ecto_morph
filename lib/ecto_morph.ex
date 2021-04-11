@@ -434,7 +434,7 @@ defmodule EctoMorph do
   Creates a map out of the Ecto struct, removing the internal ecto fields. Optionally you can remove
   the inserted_at and updated_at timestamp fields also by passing in :exclude_timestamps as an option
 
-  This function is not deep. Prefer `deep_filter_by_schema_fields/2`
+  This function is not deep. Prefer `deep_filter_by_schema_fields` or `filter_by_schema_fields`
 
   ### Examples
 
@@ -506,56 +506,74 @@ defmodule EctoMorph do
   """
   # Now the natural question is can we extend this to allow the Repo.preload syntax ? I.e. a tree?
   # [:this, plus: :this, and: [:also, these: :too]] ? I think the zipper Idea helps that along a lot.
-  def validate_nested_changeset(_, [], _) do
+
+  # so let's extract the traversal. And let's have it be a keyword lens maybe. The simplest way
+  # is to expand the lens and traverse it then. But after extracting the traversal.
+  def validate_nested_changeset(_, [], _validation_fun) do
     raise InvalidPathError, "You must provide at least one field in the path"
   end
 
-  def validate_nested_changeset(changeset, path_to_nested_changeset, validation_fun) do
+  def validate_nested_changeset(changeset, path, validation_fun) do
+    fun = fn parent ->
+      with validated = %Ecto.Changeset{} <- validation_fun.(parent) do
+        validated
+      else
+        _ -> raise InvalidValidationFunction
+      end
+    end
+
+    map(changeset, path, fun)
+  end
+
+  @doc """
+  Runs the given fun for the nested changeset at the end of the given path, and merges the result
+  back into parent. If the nested changeset is a *_many relation, each of the provided relations
+  will be passed to the fun.
+
+  This can be seen as a useful lower level function to enable a bunch of other functions. It
+  essentially abstracts the traversal which has the following rules:
+
+    1. Pointing to something that isn't a changeset raises an InvalidPathError.
+      (this ensures we are working on changesets.)
+    2. Each *_many relation gets visited.
+  """
+  def map(changeset, [], _), do: changeset
+
+  def map(changeset, path_to_nested_changeset, validation_fun) do
     walk_the_path({[{nil, changeset}], path_to_nested_changeset}, validation_fun)
   end
 
-  def walk_the_path({[{_, parent = %Ecto.Changeset{}}], []}, validation_fun) do
-    with validated = %Ecto.Changeset{} <- validation_fun.(parent) do
-      validated
-    else
-      _ -> raise InvalidValidationFunction
-    end
+  defp walk_the_path({[{_, parent = %Ecto.Changeset{}}], []}, validation_fun) do
+    validation_fun.(parent)
   end
 
-  def walk_the_path({[{field, child}, {_, parent = %Ecto.Changeset{}}], []}, validation_fun) do
-    with validated = %Ecto.Changeset{} <- validation_fun.(child) do
-      new_changes = %{parent.changes | field => validated}
-      # If the parent is invalid then it needs to stay that way even if the child is valid.
-      # So we want to make the parent invalid if the child was invalid, but otherwise let
-      # it be whatever the parent already was.
-      retreat(%{parent | changes: new_changes, valid?: parent.valid? && validated.valid?}, [])
-    else
-      _ -> raise InvalidValidationFunction
-    end
+  defp walk_the_path({[{field, child}, {_, parent = %Ecto.Changeset{}}], []}, validation_fun) do
+    validated = validation_fun.(child)
+    new_changes = %{parent.changes | field => validated}
+    # If the parent is invalid then it needs to stay that way even if the child is valid.
+    # So we want to make the parent invalid if the child was invalid, but otherwise let
+    # it be whatever the parent already was.
+    retreat(%{parent | changes: new_changes, valid?: parent.valid? && validated.valid?}, [])
   end
 
-  def walk_the_path({[{field, child} | rest = [{_, parent} | _]], []}, validation_fun) do
-    with validated = %Ecto.Changeset{} <- validation_fun.(child) do
-      new_changes = %{parent.changes | field => validated}
-      valid? = parent.valid? && validated.valid?
-      retreat(%{parent | changes: new_changes, valid?: valid?}, rest)
-    else
-      _ -> raise InvalidValidationFunction
-    end
+  defp walk_the_path({[{field, child} | rest = [{_, parent} | _]], []}, validation_fun) do
+    validated = validation_fun.(child)
+    new_changes = %{parent.changes | field => validated}
+    valid? = parent.valid? && validated.valid?
+    retreat(%{parent | changes: new_changes, valid?: valid?}, rest)
   end
 
-  def walk_the_path({prev_changesets = [{_, parent} | _], [field | rest]}, validation_fun) do
+  defp walk_the_path({prev_changesets = [{_, parent} | _], [field | rest]}, validation_fun) do
     # Changes can be empty. In which case no validations need to take place.
     schema = parent.data.__struct__
 
     if not (field in (schema_fields(schema) ++
                         schema_embeds(schema) ++ schema_associations(schema))) do
-      raise InvalidPathError, """
-      EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
-      points to a nested changeset. It looks like :#{field} is not a field on #{schema}.
-
-      NB: You cannot validate through relations.
-      """
+      raise InvalidPathError,
+            "EctoMorph.validate_nested_changeset/3 requires that each field" <>
+              " in the path_to_nested_changeset points to a nested changeset. It looks " <>
+              "like :#{field} is not a field on #{schema}.\n\nNB: You cannot validate through " <>
+              "relations."
     end
 
     if map_size(parent.changes) == 0 do
@@ -587,26 +605,22 @@ defmodule EctoMorph do
           parent
 
         _ ->
-          raise InvalidPathError, """
-          EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset
-          points to a nested changeset. It looks like :#{field} points to a change that isn't a nested
-          changeset.
-          """
+          raise InvalidPathError,
+                "Each field in the path_to_nested_changeset should point to a nested changeset." <>
+                  " It looks like :#{field} points to a change that isn't a nested changeset."
       end
     end
   end
 
-  def retreat(changeset, []) do
-    changeset
-  end
+  defp retreat(changeset, []), do: changeset
 
-  def retreat(changeset, [{field, _}, {_, parent = %Ecto.Changeset{}}]) do
+  defp retreat(changeset, [{field, _}, {_, parent = %Ecto.Changeset{}}]) do
     new_changes = %{parent.changes | field => changeset}
     valid? = changeset.valid? && parent.valid?
     %{parent | changes: new_changes, valid?: valid?}
   end
 
-  def retreat(changeset, [{field, _} | rest = [{_, parent} | _]]) do
+  defp retreat(changeset, [{field, _} | rest = [{_, parent} | _]]) do
     new_changes = %{parent.changes | field => changeset}
     valid? = changeset.valid? && parent.valid?
     retreat(%{parent | changes: new_changes, valid?: valid?}, rest)
@@ -644,41 +658,194 @@ defmodule EctoMorph do
     end)
   end
 
-  # @doc """
-  # Validates whether a changeset has a the relations specified in path_to_relation.
+  @doc """
+  Validates whether a changeset has a the given fields. You can pass in relations and they will
+  be required, and you can pass in nested keys which will also be validated.
 
-  # This follows the semantics of Ecto.Changeset.validate_required and will check changes for a
-  # non null relation, then check data. If either are non null the validation will pass allowing
-  # the possibility for partial updates.
+  For the relations, this follows the semantics of Ecto.Changeset.validate_required and will check
+  changes for a non null relation, then check data. If either are non null the validation will
+  pass allowing the possibility for partial updates.
 
-  # The path to the relation can be deep. If a relation of a relation is specified as required, then
-  # so will the relation be.
+  ### Examples
 
-  # ### Examples
+    EctoMorph.generate_changeset(%{my: :data, relation: %{}}, MyModule)
+    |> EctoMorph.validate_required([:relation])
 
-  #   EctoMorph.generate_changeset(%{my: :data, relation: %{}}, MyModule)
-  #   |> EctoMorph.validate_required_relation([:relation])
+    EctoMorph.generate_changeset(%{my: :data, relation: %{nested_thing: %{}}}, MyModule)
+    |> EctoMorph.validate_required([relation: :nested_thing])
 
-  #   EctoMorph.generate_changeset(%{my: :data, relation: %{nested_thing: %{}}}, MyModule)
-  #   |> EctoMorph.validate_required_relation([relation: :nested_thing])
-  # """
-  # def validate_required_relation(changeset, path_to_relation) do
-    # We can use this probably:
-    # I think the first arg is from schema.__changeset__[:relation_name] or something.
-    # Ecto.Changeset.Relation.empty?()
-  # end
+    data = %{my: :data, relation: %{nested_thing: %{thing: 1}}}
+    EctoMorph.validate_required(data, [relation: [nested_thing: :thing]])
+  """
+  def validate_required(changeset, path) do
+    expand_path(path)
+    |> Enum.reduce(changeset, fn
+      {[], fields}, change ->
+        # not quite because fields could have a relation or an embed meaning we need to handle
+        # that different....
+        Ecto.Changeset.validate_required(change, fields)
 
-  # # From Ecto sauce:
-  # defp missing_relation(%{changes: changes, errors: errors} = changeset,
-  #                       name, current, required?, relation, opts) do
-  #   current_changes = Map.get(changes, name, current)
-  #   if required? and Relation.empty?(relation, current_changes) do
-  #     errors = [{name, {message(opts, :required_message, "can't be blank"), [validation: :required]}} | errors]
-  #     %{changeset | errors: errors, valid?: false}
-  #   else
-  #     changeset
-  #   end
-  # end
+      {path_to_nested, fields}, change ->
+        map(change, Enum.reverse(path_to_nested), fn ch ->
+          Ecto.Changeset.validate_required(change, fields)
+        end)
+    end)
+
+    # Now just need to validate this path: [nested: :thing] and [:thing] when thing is a relation....
+    # and [:thing, thing: :okay, and: :another]
+
+    # map(changeset, path, require_fields)
+    # do_validate_required(changeset, path, changeset)
+  end
+
+  # this function turns [nested: [:thing, another: [:thing, :third]]] into
+  # [{[:nested], [:thing]}, {[:another, :nested], [:thing, :third]}]
+  def expand_path(fields), do: expand_path(fields, {[], []})
+
+  def expand_path([], {_parent, acc}), do: Enum.reverse(acc)
+
+  # We should only get here from reducing.
+  def expand_path({field, nested}, {parent, acc}) when is_atom(nested) do
+    [{Enum.reverse([field | parent]), [nested]} | acc]
+  end
+
+  def expand_path({field, nested}, {parent, acc}) when is_list(nested) do
+    new_parent = [field | parent]
+    case split_fields(nested)|> IO.inspect(limit: :infinity, label: "") do
+      [top_level, nested_fields] ->
+        start = {new_parent, [{Enum.reverse(new_parent), top_level} | acc]}
+
+        {_, result} =
+          Enum.reduce(nested_fields, start, fn f, {parent, acc} ->
+            {parent, expand_path(f, {parent, acc})}
+          end)
+
+        Enum.reverse(result)
+
+      [[x | _] = top_level_fields] when is_atom(x) ->
+        [{Enum.reverse(new_parent), top_level_fields} | acc]
+
+      [[{_, _} | _] = nested_fields] ->
+        {_, result} =
+          Enum.reduce(nested_fields, {new_parent, acc}, fn f, {parent, acc} ->
+            {parent, expand_path(f, {parent, acc})}
+          end)
+
+        Enum.reverse(result)
+    end
+  end
+
+  def expand_path([{field, nested} | rest], {parent, acc}) when is_atom(nested) do
+    new_parent = [field | parent]
+    expand_path(rest, {new_parent, [{Enum.reverse(new_parent), [nested]} | acc]})
+  end
+
+  def expand_path([{field, nested} | rest], {parent, acc}) when is_list(nested) do
+    new_parent = [field | parent]
+    case split_fields(nested) do
+      [top_level, nested_fields] ->
+        start = {new_parent, [{Enum.reverse(new_parent), top_level} | acc]}
+
+        new_acc =
+          Enum.reduce(nested_fields, start, fn f, {parent, acc} ->
+            {parent, expand_path(f, {parent, acc})}
+          end)
+
+        expand_path(rest, new_acc)
+
+      [[x | _] = top_level_fields] when is_atom(x) ->
+        expand_path(rest, {new_parent, [{Enum.reverse(new_parent), top_level_fields} | acc]})
+
+      [[{_, _} | _] = nested_fields] ->
+        {_, new_acc} =
+          Enum.reduce(nested_fields, {new_parent, acc}, fn f, {parent, acc} ->
+            {parent, expand_path(f, {parent, acc})}
+          end)
+
+        expand_path(rest, {parent, new_acc})
+    end
+  end
+
+  def expand_path(fields, {[], []}) when is_list(fields) do
+    case split_fields(fields) do
+      [top_level, nested_fields] ->
+        {_, result} =
+          Enum.reduce(nested_fields, {[], [{[], top_level}]}, fn f, {parent, acc} ->
+            # Each item in here needs to know the parent. getting it from the prev
+            # doesn't work because the next iteration overwrites it..... so we need to
+            # keep that state.....
+            {parent, expand_path(f, {parent, acc})}
+          end)
+
+        Enum.reverse(result)
+
+      [[x | _] = top_level_fields] when is_atom(x) ->
+        [{[], top_level_fields}]
+    end
+  end
+
+  def split_fields(fields) do
+    Enum.chunk_by(fields, fn
+      {_, _} -> true
+      _ -> false
+    end)
+  end
+
+  defp do_validate_required(
+         %Ecto.Changeset{changes: changes, data: data} = changeset,
+         [key | rest],
+         acc
+       ) do
+    schema = data.__struct__
+    # Once you start in data you continue down the path in data
+    # But up till then you always check changes first.
+    with {_, relation} <- Map.get(schema.__changeset__(), key, :not_found) do
+      # Could be missing in changes...
+      relation_in_changes = Map.get(data, key, nil)
+      # Key should be present in data
+      relation_in_data = Map.fetch!(data, key)
+
+      relation_in_changes? = Ecto.Changeset.Relation.empty?(relation, relation_in_changes)
+      relation_in_data? = Ecto.Changeset.Relation.empty?(relation, relation_in_data)
+
+      # If it's in changes then continue on.
+      if relation_in_changes? do
+        validate_required(relation_in_changes, rest)
+      else
+        # parent is invalid. We also need to unwind
+        errors = []
+        %{changeset | errors: errors, valid?: false}
+      end
+    else
+      :not_found ->
+        raise InvalidPathError,
+              "The path pointed to a field that is not on the schema" <>
+                " please ensure the path is correct."
+    end
+  end
+
+  # From Ecto sauce:
+  defp missing_relation(
+         %{changes: changes, errors: errors} = changeset,
+         name,
+         current,
+         required?,
+         relation,
+         opts
+       ) do
+    # current_changes = Map.get(changes, name, current)
+
+    # if required? and Relation.empty?(relation, current_changes) do
+    #   errors = [
+    #     {name, {message(opts, :required_message, "can't be blank"), [validation: :required]}}
+    #     | errors
+    #   ]
+
+    #   %{changeset | errors: errors, valid?: false}
+    # else
+    #   changeset
+    # end
+  end
 
   defp cast(current, data, fields) do
     Ecto.Changeset.cast(current, data, fields)
