@@ -678,28 +678,33 @@ defmodule EctoMorph do
     EctoMorph.validate_required(data, [relation: [nested_thing: :thing]])
   """
   def validate_required(changeset, path) do
+    schema = changeset.data.__struct__
+    relations = schema_embeds(schema) ++ schema_associations(schema)
+
     expand_path(path)
     |> Enum.reduce(changeset, fn
       {[], fields}, change ->
         # not quite because fields could have a relation or an embed meaning we need to handle
         # that different....
-        Ecto.Changeset.validate_required(change, fields)
+        {relation_fields, normal_fields} =
+          Enum.split_with(fields, fn field -> field in relations end)
+
+        Ecto.Changeset.validate_required(change, normal_fields)
+        |> validate_required_relations(relation_fields)
 
       {path_to_nested, fields}, change ->
-        map(change, Enum.reverse(path_to_nested), fn ch ->
-          Ecto.Changeset.validate_required(change, fields)
+        map(change, path_to_nested, fn ch ->
+          {relation_fields, normal_fields} =
+            Enum.split_with(fields, fn field -> field in relations end)
+
+          Ecto.Changeset.validate_required(ch, normal_fields)
+          |> validate_required_relations(relation_fields)
         end)
     end)
-
-    # Now just need to validate this path: [nested: :thing] and [:thing] when thing is a relation....
-    # and [:thing, thing: :okay, and: :another]
-
-    # map(changeset, path, require_fields)
-    # do_validate_required(changeset, path, changeset)
   end
 
   # this function turns [nested: [:thing, another: [:thing, :third]]] into
-  # [{[:nested], [:thing]}, {[:another, :nested], [:thing, :third]}]
+  # [{[:nested], [:thing]}, {[:nested, :another], [:thing, :third]}]
   def expand_path(fields), do: expand_path(fields, {[], []})
 
   def expand_path([], {_parent, acc}), do: Enum.reverse(acc)
@@ -711,7 +716,8 @@ defmodule EctoMorph do
 
   def expand_path({field, nested}, {parent, acc}) when is_list(nested) do
     new_parent = [field | parent]
-    case split_fields(nested)|> IO.inspect(limit: :infinity, label: "") do
+
+    case split_fields(nested) |> IO.inspect(limit: :infinity, label: "") do
       [top_level, nested_fields] ->
         start = {new_parent, [{Enum.reverse(new_parent), top_level} | acc]}
 
@@ -742,6 +748,7 @@ defmodule EctoMorph do
 
   def expand_path([{field, nested} | rest], {parent, acc}) when is_list(nested) do
     new_parent = [field | parent]
+
     case split_fields(nested) do
       [top_level, nested_fields] ->
         start = {new_parent, [{Enum.reverse(new_parent), top_level} | acc]}
@@ -791,30 +798,36 @@ defmodule EctoMorph do
     end)
   end
 
-  defp do_validate_required(
+  defp validate_required_relations(changeset, relations) do
+    Enum.reduce(relations, changeset, fn r, acc -> validate_required_relation(acc, r) end)
+  end
+
+  defp validate_required_relation(
          %Ecto.Changeset{changes: changes, data: data} = changeset,
-         [key | rest],
-         acc
+         relation_field
        ) do
     schema = data.__struct__
     # Once you start in data you continue down the path in data
     # But up till then you always check changes first.
-    with {_, relation} <- Map.get(schema.__changeset__(), key, :not_found) do
+    with {_, relation} <- Map.get(schema.__changeset__(), relation_field, :not_found) do
       # Could be missing in changes...
-      relation_in_changes = Map.get(data, key, nil)
-      # Key should be present in data
-      relation_in_data = Map.fetch!(data, key)
+      relation_in_changes = Map.get(data, relation_field)
+      # Key should be present in data (it just might be nil)
+      # So like I guess the relation should be preloaded ? How we gonna require the relation?
+      relation_in_data = Map.fetch!(data, relation_field)
 
-      relation_in_changes? = Ecto.Changeset.Relation.empty?(relation, relation_in_changes)
-      relation_in_data? = Ecto.Changeset.Relation.empty?(relation, relation_in_data)
+      relation_not_in_changes? = Ecto.Changeset.Relation.empty?(relation, relation_in_changes)
+      relation_not_in_data? = Ecto.Changeset.Relation.empty?(relation, relation_in_data)
 
-      # If it's in changes then continue on.
-      if relation_in_changes? do
-        validate_required(relation_in_changes, rest)
+      if relation_not_in_changes? do
+        if relation_not_in_data? do
+          errors = [{relation_field, {"can't be blank", [validation: :required]}} | changeset.errors]
+          %{changeset | errors: errors, valid?: false}
+        else
+          changeset
+        end
       else
-        # parent is invalid. We also need to unwind
-        errors = []
-        %{changeset | errors: errors, valid?: false}
+        changeset
       end
     else
       :not_found ->
@@ -822,29 +835,6 @@ defmodule EctoMorph do
               "The path pointed to a field that is not on the schema" <>
                 " please ensure the path is correct."
     end
-  end
-
-  # From Ecto sauce:
-  defp missing_relation(
-         %{changes: changes, errors: errors} = changeset,
-         name,
-         current,
-         required?,
-         relation,
-         opts
-       ) do
-    # current_changes = Map.get(changes, name, current)
-
-    # if required? and Relation.empty?(relation, current_changes) do
-    #   errors = [
-    #     {name, {message(opts, :required_message, "can't be blank"), [validation: :required]}}
-    #     | errors
-    #   ]
-
-    #   %{changeset | errors: errors, valid?: false}
-    # else
-    #   changeset
-    # end
   end
 
   defp cast(current, data, fields) do

@@ -1,10 +1,21 @@
-defmodule EctoMorph.ValidateRequiredRelationTest do
+defmodule EctoMorph.ValidateRequiredTest do
   use ExUnit.Case, async: false
 
-  test "relation pointed to is marked as required" do
-    EctoMorph.generate_changeset(json, SchemaUnderTest)
+# [
+#   [:thing, thing: [okay: :then, if: :yes], and: :another],
+#   [and: :another],
+#   [:thing, thing: [okay: :then, if: :yes], and: [:another]],
+#   [:thing, :another, :last],
+#   [:thing, :another, :last],
+#   [thing: [okay: :then, if: :yes], and: [:another]]
+# ]
+# |> Enum.map(fn x -> EctoMorph.expand_path(x) end)
+
+  test "has_many not in changes" do
+    ch = EctoMorph.generate_changeset(json, SchemaUnderTest)
     |> EctoMorph.validate_required([:steamed_hams])
-    |> IO.inspect(limit: :infinity, label: "")
+    assert ch.valid? == false
+    assert ch.errors == [{:steamed_hams, {"can't be blank", [validation: :required]}}]
   end
 
   test "invalid changeset when required is missing" do
@@ -37,15 +48,15 @@ defmodule EctoMorph.ValidateRequiredRelationTest do
       "naive_datetime_usec" => "2000-02-29T00:00:00",
       "utc_datetime" => "2019-04-08T14:31:14.366732Z",
       "utc_datetime_usec" => "2019-04-08T14:31:14.366732Z",
-      "steamed_hams" => [
-        %{"meat_type" => "beef", "pickles" => 2, "sauce_ratio" => "0.5"},
-        %{
-          "meat_type" => "chicken",
-          "pickles" => 1,
-          "sauce_ratio" => "0.7",
-          "double_nested_schema" => %{"value" => "works!"}
-        }
-      ],
+      # "steamed_hams" => [
+      #   %{"meat_type" => "beef", "pickles" => 2, "sauce_ratio" => "0.5"},
+      #   %{
+      #     "meat_type" => "chicken",
+      #     "pickles" => 1,
+      #     "sauce_ratio" => "0.7",
+      #     "double_nested_schema" => %{"value" => "works!"}
+      #   }
+      # ],
       "aurora_borealis" => %{
         "location" => "Kitchen",
         "probability" => "0.001",
