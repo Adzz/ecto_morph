@@ -705,6 +705,8 @@ defmodule EctoMorph do
 
   # this function turns [nested: [:thing, another: [:thing, :third]]] into
   # [{[:nested], [:thing]}, {[:nested, :another], [:thing, :third]}]
+  # allowing us to iterate through them and apply the correct validations. Is it possible
+  # to have this expand at compile time to speed up runtime?
   def expand_path(fields), do: expand_path(fields, {[], []})
 
   def expand_path([], {_parent, acc}), do: Enum.reverse(acc)
@@ -717,7 +719,7 @@ defmodule EctoMorph do
   def expand_path({field, nested}, {parent, acc}) when is_list(nested) do
     new_parent = [field | parent]
 
-    case split_fields(nested) |> IO.inspect(limit: :infinity, label: "") do
+    case split_fields(nested) do
       [top_level, nested_fields] ->
         start = {new_parent, [{Enum.reverse(new_parent), top_level} | acc]}
 
@@ -792,6 +794,7 @@ defmodule EctoMorph do
   end
 
   def split_fields(fields) do
+    # This is probably better as split_with. Refactor when we have more better tests.
     Enum.chunk_by(fields, fn
       {_, _} -> true
       _ -> false
@@ -802,6 +805,10 @@ defmodule EctoMorph do
     Enum.reduce(relations, changeset, fn r, acc -> validate_required_relation(acc, r) end)
   end
 
+  @empty_default %{
+    many: [],
+    one: nil
+  }
   defp validate_required_relation(
          %Ecto.Changeset{changes: changes, data: data} = changeset,
          relation_field
@@ -810,10 +817,11 @@ defmodule EctoMorph do
     # Once you start in data you continue down the path in data
     # But up till then you always check changes first.
     with {_, relation} <- Map.get(schema.__changeset__(), relation_field, :not_found) do
-      # Could be missing in changes...
-      relation_in_changes = Map.get(data, relation_field)
+      # Could be missing in changes... In which case we need to default to the "empty" for
+      # the given cardinality.
+      empty_default = Map.fetch!(@empty_default, relation.cardinality)
+      relation_in_changes = Map.get(changes, relation_field, empty_default)
       # Key should be present in data (it just might be nil)
-      # So like I guess the relation should be preloaded ? How we gonna require the relation?
       relation_in_data = Map.fetch!(data, relation_field)
 
       relation_not_in_changes? = Ecto.Changeset.Relation.empty?(relation, relation_in_changes)
@@ -821,7 +829,10 @@ defmodule EctoMorph do
 
       if relation_not_in_changes? do
         if relation_not_in_data? do
-          errors = [{relation_field, {"can't be blank", [validation: :required]}} | changeset.errors]
+          errors = [
+            {relation_field, {"can't be blank", [validation: :required]}} | changeset.errors
+          ]
+
           %{changeset | errors: errors, valid?: false}
         else
           changeset
