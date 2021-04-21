@@ -515,18 +515,19 @@ defmodule EctoMorph do
 
   def validate_nested_changeset(changeset, path, validation) do
     fun = fn
-    {_, ch} -> ch
-    parent ->
-      with validated = %Ecto.Changeset{} <- validation.(parent) do
-        validated
-      else
-        _ -> raise InvalidValidationFunction
-      end
+      {_, ch} ->
+        ch
+
+      parent ->
+        with validated = %Ecto.Changeset{} <- validation.(parent) do
+          validated
+        else
+          _ -> raise InvalidValidationFunction
+        end
     end
 
     map(changeset, path, fun)
   end
-
 
   # Runs the given fun for the nested changeset at the end of the given path, and merges the result
   # back into parent. If the nested changeset is a *_many relation, each of the provided relations
@@ -538,6 +539,7 @@ defmodule EctoMorph do
   #   1. Pointing to something that isn't a changeset raises an InvalidPathError.
   #     (this ensures we are working on changesets.)
   #   2. Each *_many relation gets visited.
+  #   3. All changes are merged back into the parent changeset.
   defp map(changeset, [], _), do: changeset
 
   defp map(changeset, path_to_nested_changeset, map_fun) do
@@ -570,6 +572,7 @@ defmodule EctoMorph do
 
     if not (field in (schema_fields(schema) ++
                         schema_embeds(schema) ++ schema_associations(schema))) do
+      # This error is now wrong if we use map for other things....
       raise InvalidPathError,
             "EctoMorph.validate_nested_changeset/3 requires that each field" <>
               " in the path_to_nested_changeset points to a nested changeset. It looks " <>
@@ -603,6 +606,9 @@ defmodule EctoMorph do
         # However that makes it impossible to validate_required because we need to know more info
         # basically all options SUCK, this is a hacky solution for now, prevents us from making
         # map public...
+
+        # The real problem here is that we've called this map, but map never deals with missing
+        # bits.
         nil ->
           map_fun.({field, parent})
 
@@ -688,7 +694,10 @@ defmodule EctoMorph do
     relations = schema_embeds(schema) ++ schema_associations(schema)
 
     # We choose to expand the keyword like lens to make the implementation simpler. Otherwise
-    # the traverse gets very error prone and tricky.
+    # the traverse gets very error prone and tricky. But it's not a simple KeywordLens.expand
+    # because we end up with a flat list of tuples, each with the path to the fields to be
+    # validated on the left, and fields that are required on the right. If the left list
+    # is empty it means the fields are on the top level.
     expand_path(path)
     |> Enum.reduce(changeset, fn
       {[], fields}, change ->
@@ -720,10 +729,13 @@ defmodule EctoMorph do
 
   # this function turns [nested: [:thing, another: [:thing, :third]]] into
   # [{[:nested], [:thing]}, {[:nested, :another], [:thing, :third]}]
-  # allowing us to iterate through them and apply the correct validations. Is it possible
-  # to have this expand at compile time to speed up runtime?
+
+  # Is it possible to have this expand at compile time to speed up runtime?
+  # We make this public to test. we should also actually test it.
+  @doc false
   def expand_path(fields), do: expand_path(fields, {[], []})
 
+  @doc false
   def expand_path([], {_parent, acc}), do: Enum.reverse(acc)
 
   # We should only get here from reducing.
@@ -820,7 +832,6 @@ defmodule EctoMorph do
     Enum.reduce(relations, changeset, fn r, acc -> validate_required_relation(acc, r) end)
   end
 
-  @empty_default %{many: [], one: nil}
   defp validate_required_relation(
          %Ecto.Changeset{changes: changes, data: data} = changeset,
          relation_field
@@ -829,15 +840,10 @@ defmodule EctoMorph do
     # Once you start in data you continue down the path in data
     # But up till then you always check changes first.
     with {_, relation} <- Map.get(schema.__changeset__(), relation_field, :not_found) do
-      # Could be missing in changes... In which case we need to default to the "empty" for
-      # the given cardinality.
-      empty_default = Map.fetch!(@empty_default, relation.cardinality)
-      relation_in_changes = Map.get(changes, relation_field, empty_default)
-      # Key should be present in data (it just might be nil)
+      relation_in_changes = Map.get(changes, relation_field)
       relation_in_data = Map.fetch!(data, relation_field)
-
-      relation_not_in_changes? = Ecto.Changeset.Relation.empty?(relation, relation_in_changes)
-      relation_not_in_data? = Ecto.Changeset.Relation.empty?(relation, relation_in_data)
+      relation_not_in_changes? = empty_relation?(relation, relation_in_changes)
+      relation_not_in_data? = empty_relation?(relation, relation_in_data)
 
       if relation_not_in_changes? do
         if relation_not_in_data? do
@@ -858,6 +864,21 @@ defmodule EctoMorph do
               "The path pointed to a field that is not on the schema" <>
                 " please ensure the path is correct."
     end
+  end
+
+  # Checks if the container can be considered empty. Copied and slightly modified from
+  # Ecto.Changeset.Relation
+  defp empty_relation?(%{cardinality: _}, %Ecto.Association.NotLoaded{}), do: true
+  defp empty_relation?(%{cardinality: _}, nil), do: true
+  defp empty_relation?(%{cardinality: :many}, []), do: true
+  defp empty_relation?(%{cardinality: :many}, changes), do: filter_empty(changes) == []
+  defp empty_relation?(%{}, _), do: false
+
+  defp filter_empty(changes) do
+    Enum.filter(changes, fn
+      %Ecto.Changeset{action: action} when action in [:replace, :delete] -> false
+      _ -> true
+    end)
   end
 
   defp cast(current, data, fields) do
