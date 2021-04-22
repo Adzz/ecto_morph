@@ -492,6 +492,8 @@ defmodule EctoMorph do
   This works with has_many relations by validating the list of changesets. If you are validating
   their nested relations, each changeset in the list must have the nested relation in their changes.
 
+  If you provide a path to changeset that does not exist in changes....
+
   ### Examples
 
   ```elixir
@@ -567,15 +569,12 @@ defmodule EctoMorph do
   end
 
   defp walk_the_path({prev_changesets = [{_, parent} | _], [field | rest]}, map_fun) do
-    # Changes can be empty. In which case no validations need to take place.
     schema = parent.data.__struct__
 
     if not (field in (schema_fields(schema) ++
                         schema_embeds(schema) ++ schema_associations(schema))) do
-      # This error is now wrong if we use map for other things....
       raise InvalidPathError,
-            "EctoMorph.validate_nested_changeset/3 requires that each field" <>
-              " in the path_to_nested_changeset points to a nested changeset. It looks " <>
+            "Each field in the path_to_nested_changeset should point to a nested changeset. It looks " <>
               "like :#{field} is not a field on #{schema}.\n\nNB: You cannot validate through " <>
               "relations."
     end
@@ -607,8 +606,9 @@ defmodule EctoMorph do
         # basically all options SUCK, this is a hacky solution for now, prevents us from making
         # map public...
 
-        # The real problem here is that we've called this map, but map never deals with missing
-        # bits.
+        # The real problem here is that we are traversing a thing, and if the path we are traversing
+        # ends I need to know. But really what I need to be given in that case could vary
+        # depending on our use case......
         nil ->
           map_fun.({field, parent})
 
@@ -727,15 +727,15 @@ defmodule EctoMorph do
     end)
   end
 
-  # this function turns [nested: [:thing, another: [:thing, :third]]] into
+  # This function turns [nested: [:thing, another: [:thing, :third]]] into
   # [{[:nested], [:thing]}, {[:nested, :another], [:thing, :third]}]
 
-  # Is it possible to have this expand at compile time to speed up runtime?
-  # We make this public to test. we should also actually test it.
   @doc false
+  # This function is public to test, but should be considered private to library users.
   def expand_path(fields), do: expand_path(fields, {[], []})
 
   @doc false
+  # This function is public to test, but should be considered private to library users.
   def expand_path([], {_parent, acc}), do: Enum.reverse(acc)
 
   # We should only get here from reducing.

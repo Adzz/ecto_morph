@@ -273,6 +273,7 @@ defmodule EctoMorph.ValidateRequiredTest do
     end
   end
 
+  # This is a private function but is public so that I can test it.
   describe "expand_path/1" do
     test "[:thing, thing: [okay: :then, if: :yes], and: :another]" do
       path = [:thing, thing: [okay: :then, if: :yes], and: :another]

@@ -284,7 +284,7 @@ defmodule EctoMorph.ValidateNestedChangesetTest do
     ch = EctoMorph.generate_changeset(json, SchemaUnderTest)
 
     error_message =
-      "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset points to a nested changeset. It looks like :not_a_field is not a field on Elixir.SchemaUnderTest.\n\nNB: You cannot validate through relations."
+      "Each field in the path_to_nested_changeset should point to a nested changeset. It looks like :not_a_field is not a field on Elixir.SchemaUnderTest.\n\nNB: You cannot validate through relations."
 
     # Can we alert people to the fact that the path is incorrect.
     # More importantly.... Should we???????????
@@ -303,7 +303,7 @@ defmodule EctoMorph.ValidateNestedChangesetTest do
     end)
 
     error_message =
-      "EctoMorph.validate_nested_changeset/3 requires that each field in the path_to_nested_changeset points to a nested changeset. It looks like :integer is not a field on Elixir.AuroraBorealis.\n\nNB: You cannot validate through relations."
+      "Each field in the path_to_nested_changeset should point to a nested changeset. It looks like :integer is not a field on Elixir.AuroraBorealis.\n\nNB: You cannot validate through relations."
 
     assert_raise(EctoMorph.InvalidPathError, error_message, fn ->
       EctoMorph.validate_nested_changeset(ch, [:aurora_borealis, :integer], & &1)
