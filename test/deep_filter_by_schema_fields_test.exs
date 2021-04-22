@@ -164,6 +164,111 @@ defmodule EctoMorph.DeepFilterBySchemaFieldsTest do
              }
     end
 
+    test "filtering not loaded" do
+      data = %OverlapAndSome{
+        binary_id: 1,
+        ignored: "not a fields",
+        filltered: "this is filtered",
+        has_many: nil,
+        steamed_hams: [
+          %SteamedHams{
+            meat_type: "beef",
+            pickles: 2,
+            sauce_ratio: Decimal.new("0.5"),
+            double_nested_schema: %{value: "works!"}
+          }
+        ]
+      }
+
+      result =
+        EctoMorph.deep_filter_by_schema_fields(data, SchemaUnderTest, filter_not_loaded: true)
+
+      assert %{
+               array_of_ints: nil,
+               aurora_borealis: nil,
+               binary: nil,
+               binary_id: 1,
+               boolean: nil,
+               date: nil,
+               float: nil,
+               has_many: nil,
+               id: nil,
+               integer: nil,
+               map: nil,
+               map_of_integers: nil,
+               naive_datetime: nil,
+               naive_datetime_usec: nil,
+               name: "Seymour!",
+               percentage: nil,
+               steamed_ham: nil,
+               steamed_hams: [
+                 %{
+                   double_nested_schema: %{value: "works!"},
+                   id: nil,
+                   meat_type: "beef",
+                   pickles: 2,
+                   sauce_ratio: %Decimal{}
+                 }
+               ],
+               throughs: nil,
+               time: nil,
+               utc_datetime: nil,
+               utc_datetime_usec: nil
+             } = result
+    end
+
+    test "when relations aren't loaded" do
+      data = %OverlapAndSome{
+        binary_id: 1,
+        ignored: "not a fields",
+        filltered: "this is filtered",
+        has_many: nil,
+        steamed_hams: [
+          %SteamedHams{
+            meat_type: "beef",
+            pickles: 2,
+            sauce_ratio: Decimal.new("0.5"),
+            double_nested_schema: %{value: "works!"}
+          }
+        ]
+      }
+
+      result = EctoMorph.deep_filter_by_schema_fields(data, SchemaUnderTest)
+
+      assert %{
+               array_of_ints: nil,
+               aurora_borealis: nil,
+               binary: nil,
+               binary_id: 1,
+               boolean: nil,
+               date: nil,
+               float: nil,
+               has_many: nil,
+               id: nil,
+               integer: nil,
+               map: nil,
+               map_of_integers: nil,
+               naive_datetime: nil,
+               naive_datetime_usec: nil,
+               name: "Seymour!",
+               percentage: nil,
+               steamed_ham: nil,
+               steamed_hams: [
+                 %{
+                   double_nested_schema: %{value: "works!"},
+                   id: nil,
+                   meat_type: "beef",
+                   pickles: 2,
+                   sauce_ratio: %Decimal{}
+                 }
+               ],
+               throughs: %Ecto.Association.NotLoaded{},
+               time: nil,
+               utc_datetime: nil,
+               utc_datetime_usec: nil
+             } = result
+    end
+
     test "Non ecto struct" do
       data = %NonEctoStruct{integer: 1}
       result = EctoMorph.deep_filter_by_schema_fields(data, SchemaUnderTest)
