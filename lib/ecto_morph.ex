@@ -480,19 +480,26 @@ defmodule EctoMorph do
   end
 
   @doc """
-  Allows us to specify validations for nested changesets. Accepts a path to a nested changeset,
-  and a validation function. The validation fun will be passed the changeset at the end of the
-  path, and the result of the validation function will be merged back into the parent changeset.
+  Allows us to specify validations for nested changesets.
+
+  Accepts a path to a nested changeset, and a validation function. The validation fun will
+  be passed the changeset at the end of the path, and the result of the validation function
+  will be merged back into the parent changeset.
 
   If a changeset is invalid, the parent will also be marked as valid?: false (as well as any
   changeset between the root changeset and the nested one), but the error messages will remain
   on the changeset they are relevant for. This is in line with how Ecto works elsewhere like
   in cast_embed etc. To get the nested error messages you can use `Ecto.Changeset.traverse_errors`
 
-  This works with has_many relations by validating the list of changesets. If you are validating
+  This works with *_many relations by validating the list of changesets. If you are validating
   their nested relations, each changeset in the list must have the nested relation in their changes.
 
-  If you provide a path to changeset that does not exist in changes....
+  If you provide a path to changeset that does not exist in changes then no validation will run
+  for that changeset. This is to allow partial updates - essentially only validating changes that
+  exist.
+
+  If you want to validate that a set of fields are present (either on the changeset.changes or in
+  changeset.data), then use `EctoMorph.validate_required/2`
 
   ### Examples
 
