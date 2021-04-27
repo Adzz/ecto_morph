@@ -1,5 +1,14 @@
 # Changelog for version 0.X
 
+## 0.1.24
+
+### Enhancement
+
+Adds a new function: `EctoMorph.validate_required/2` which allows you to specify a list of arbitrarily nested fields which will be marked as required. You may also mark relations and embeds as required. This lets you generate the changeset and then mark stuff as required, whereas ecto forces you to provide that option on cast_assoc / cast_embed. See the docs for examples.
+
+Adds an option to `filter_by_schema_fields` and `deep_filter_by_schema_fields` which allows you to filter nillify not loaded relations.
+
+
 ## 0.1.23
 
 ### Enhancement

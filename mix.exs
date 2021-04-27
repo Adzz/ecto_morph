@@ -6,7 +6,7 @@ defmodule EctoMorph.MixProject do
       name: "EctoMorph",
       app: :ecto_morph,
       description: description(),
-      version: "0.1.23",
+      version: "0.1.24",
       package: package(),
       elixirc_paths: elixirc_paths(Mix.env()),
       elixir: "~> 1.9",
