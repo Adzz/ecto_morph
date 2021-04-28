@@ -302,13 +302,16 @@ defmodule EctoMorph do
   end
 
   @doc """
-  Returns a map of all of the schema fields contained within data. This is not recursive so look
-  at deep_filter_by_schema_fields if you want a recursive version.
+  Returns a map of all of the given schema's fields contained within data. This is not
+  recursive so look at deep_filter_by_schema_fields if you want a recursive version.
 
   ### Options
 
     * filter_not_loaded - This will nillify any Ecto.Association.NotLoaded structs in the map,
                           setting the value to be nil for any non loaded association.
+
+    * filter_assocs - This will remove any key from data that is the same as any of the associations
+                      (including embeds) in schema.
 
       iex> data = %{id: 1, other: %Ecto.Association.NotLoaded{}}
       ...> filter_by_schema_fields(data, MySchema, filter_not_loaded: true)
@@ -321,8 +324,12 @@ defmodule EctoMorph do
   @spec filter_by_schema_fields(map(), schema_module, list()) :: map()
   def filter_by_schema_fields(data, schema, opts \\ []) do
     filter? = Keyword.get(opts, :filter_not_loaded, false)
+    assocs? = Keyword.get(opts, :filter_assocs, false)
 
-    Map.take(data, all_schema_fields(schema))
+    assocs = if assocs?, do: schema.__schema__(:associations) ++ schema_embeds(schema), else: []
+    fields = all_schema_fields(schema) -- assocs
+
+    Map.take(data, fields)
     |> Enum.into(%{}, fn
       {key, %Ecto.Association.NotLoaded{} = v} -> if filter?, do: {key, nil}, else: {key, v}
       {key, nil} -> {key, nil}
