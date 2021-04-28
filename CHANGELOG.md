@@ -1,5 +1,11 @@
 # Changelog for version 0.X
 
+## 0.1.25
+
+### Bug Fix
+
+The previous release inadvertently changed the behaviour of `filter_by_schema_fields` by including associations by default. Previously that wasn't the case. So now we add back in an option to exclude any associations when filtering by schema fields.
+
 ## 0.1.24
 
 ### Enhancement
