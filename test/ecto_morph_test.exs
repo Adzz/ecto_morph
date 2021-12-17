@@ -1115,7 +1115,9 @@ defmodule EctoMorphTest do
                meat_type: nil,
                pickles: nil,
                sauce_ratio: nil,
-               double_nested_schema: nil
+               double_nested_schema: nil,
+               has_many_id: nil,
+               has_one_id: nil
              }
     end
 

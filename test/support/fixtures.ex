@@ -78,6 +78,8 @@ defmodule SteamedHams do
     field(:meat_type, :string)
     field(:pickles, :integer)
     field(:sauce_ratio, :decimal)
+    field(:has_many_id, :string)
+    field(:has_one_id, :string)
     embeds_one(:double_nested_schema, DoubleNestedSchema)
   end
 end
@@ -101,6 +103,7 @@ defmodule Through do
 
   schema "through" do
     field(:rad_level, :integer)
+    field(:has_many_id, :string)
   end
 end
 
@@ -109,6 +112,9 @@ defmodule HasMany do
 
   schema "newest_table" do
     field(:geese_to_feed, :integer)
+    field(:table_backed_schema_id, :string)
+    field(:schema_under_test_id, :string)
+    field(:overlap_and_some_id, :string)
     has_one(:through, Through)
     has_many(:steamed_hams, SteamedHams)
   end
@@ -119,6 +125,7 @@ defmodule HasOne do
 
   schema "other_table" do
     field(:hen_to_eat, :integer)
+    field(:table_backed_schema_id, :string)
     has_one(:steamed_ham, SteamedHams)
   end
 end
