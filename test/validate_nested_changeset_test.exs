@@ -356,7 +356,7 @@ defmodule EctoMorph.ValidateNestedChangesetTest do
       EctoMorph.generate_changeset(json, existing)
       |> EctoMorph.validate_nested_changeset([:steamed_hams], fn changeset ->
         changeset
-        # Becuase on_replace is set to delete the changeset is always valid.
+        # Because on_replace is set to delete the changeset is always valid.
         |> Ecto.Changeset.validate_number(:pickles, greater_than: 55)
       end)
 

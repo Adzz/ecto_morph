@@ -31,7 +31,7 @@ defmodule EctoMorph do
   because they will exist in the schema definitions.)
 
   We filter out any keys that are not defined in the schema, and if the first argument is a struct,
-  we call Map.from_struct/1 on it first. This can be useful for converting data between structs.
+  we call `Map.from_struct/1` on it first. This can be useful for converting data between structs.
 
   Check out the tests for more full examples.
 
@@ -75,18 +75,16 @@ defmodule EctoMorph do
   Accepts a whitelist of fields that you allow updates / inserts on. This list of fields can define
   fields for inner schemas also like so:
 
-  ```elixir
-    EctoMorph.cast_to_struct(json, SchemaUnderTest, [
-      :boolean,
-      :name,
-      :binary,
-      :array_of_ints,
-      steamed_hams: [:pickles, double_nested_schema: [:value]]
-    ])
-  ```
+      EctoMorph.cast_to_struct(json, SchemaUnderTest, [
+        :boolean,
+        :name,
+        :binary,
+        :array_of_ints,
+        steamed_hams: [:pickles, double_nested_schema: [:value]]
+      ])
 
   We filter out any keys that are not defined in the schema, and if the first argument is a struct,
-  we call Map.from_struct/1 on it first. This can be useful for converting data between structs.
+  we call `Map.from_struct/1` on it first. This can be useful for converting data between structs.
   """
   def cast_to_struct(data = %{__struct__: _}, schema, fields) do
     Map.from_struct(data) |> cast_to_struct(schema, fields)
@@ -153,7 +151,6 @@ defmodule EctoMorph do
 
   ### Examples
 
-  ```elixir
       ...> data = %{
       ...>  "integer" => "77",
       ...>  "steamed_hams" => [%{
@@ -164,7 +161,7 @@ defmodule EctoMorph do
       ...> }
       ...> EctoMorph.generate_changeset(data, %SchemaUnderTest{integer: 2})
       ...>
-  ```
+
   """
   @spec generate_changeset(map() | ecto_struct, schema_module | ecto_struct) :: Ecto.Changeset.t()
   def generate_changeset(data = %{__struct__: _}, schema) do
@@ -190,7 +187,7 @@ defmodule EctoMorph do
 
   If we provide a whitelist of fields, we will be passed a changeset for the changes on those fields
   only:
-  ```elixir
+
       ...> data = %{
       ...>  "integer" => "77",
       ...>  "steamed_hams" => [%{
@@ -201,10 +198,9 @@ defmodule EctoMorph do
       ...> }
       ...> EctoMorph.generate_changeset(data, SchemaUnderTest, [:integer])
       ...>
-  ```
 
   We can also define whitelists for any arbitrarily deep relation like so:
-  ```elixir
+
       ...> data = %{
       ...>  "integer" => "77",
       ...>  "steamed_hams" => [%{
@@ -217,7 +213,7 @@ defmodule EctoMorph do
       ...>   :integer,
       ...>   steamed_hams: [:pickles, double_nested_schema: [:value]]
       ...> ])
-  ```
+
   """
   @spec generate_changeset(map(), schema_module | ecto_struct, list) :: Ecto.Changeset.t()
   def generate_changeset(data = %{__struct__: _}, schema_or_existing_struct, fields) do
@@ -303,23 +299,22 @@ defmodule EctoMorph do
 
   @doc """
   Returns a map of all of the given schema's fields contained within data. This is not
-  recursive so look at deep_filter_by_schema_fields if you want a recursive version.
+  recursive so look at `deep_filter_by_schema_fields` if you want a recursive version.
 
   ### Options
 
-    * filter_not_loaded - This will nillify any Ecto.Association.NotLoaded structs in the map,
-                          setting the value to be nil for any non loaded association.
+    * `:filter_not_loaded` - This will nillify any Ecto.Association.NotLoaded structs in the map, setting the value to be nil for any non loaded association.
 
-    * filter_assocs - This will remove any key from data that is the same as any of the associations
-                      (including embeds) in schema.
+    * `:filter_assocs` - This will remove any key from data that is the same as any of the associations (including embeds) in schema.
 
-      iex> data = %{id: 1, other: %Ecto.Association.NotLoaded{}}
-      ...> filter_by_schema_fields(data, MySchema, filter_not_loaded: true)
-      %{id: 1, other: nil}
+          iex> data = %{id: 1, other: %Ecto.Association.NotLoaded{}}
+          ...> filter_by_schema_fields(data, MySchema, filter_not_loaded: true)
+          %{id: 1, other: nil}
 
-      iex> data = %{id: 1, other: %AnotherOne{}}
-      ...> filter_by_schema_fields(data, MySchema)
-      %{id: 1, other: %AnotherOne{}}
+          iex> data = %{id: 1, other: %AnotherOne{}}
+          ...> filter_by_schema_fields(data, MySchema)
+          %{id: 1, other: %AnotherOne{}}
+
   """
   @spec filter_by_schema_fields(map(), schema_module, list()) :: map()
   def filter_by_schema_fields(data, schema, opts \\ []) do
@@ -354,7 +349,7 @@ defmodule EctoMorph do
   When filtering you can optionally choose to nillify Ecto.Association.NotLoaded structs. By
   default they are passed through as is, but you can nillify them like this:
 
-  `deep_filter_by_schema_fields(data, MySchema, filter_not_loaded: true)`
+      deep_filter_by_schema_fields(data, MySchema, filter_not_loaded: true)
 
   ### Examples
 
@@ -364,6 +359,7 @@ defmodule EctoMorph do
       iex> data = %{relation: %Ecto.Association.NotLoaded{}}
       ...> deep_filter_by_schema_fields(data, A, filter_not_loaded: true)
       %{relation: nil}
+
   """
   def deep_filter_by_schema_fields(data, schema, opts \\ []) when is_map(data) do
     filter_not_loaded = Keyword.get(opts, :filter_not_loaded, false)
@@ -473,7 +469,7 @@ defmodule EctoMorph do
 
   defmodule InvalidPathError do
     @moduledoc """
-    validate_nested_changeset requires a path in which each location points to a nested changeset.
+    `validate_nested_changeset` requires a path in which each location points to a nested changeset.
     If we are not given that, we raise an error.
     """
     defexception message:
@@ -510,15 +506,14 @@ defmodule EctoMorph do
 
   ### Examples
 
-  ```elixir
-  EctoMorph.generate_changeset(%{nested: %{foo: 3}})
-  |> EctoMorph.validate_nested_changeset([:nested], fn changeset ->
-    Ecto.Changeset.validate_number(changeset, :foo, greater_than: 5)
-  end)
+      EctoMorph.generate_changeset(%{nested: %{foo: 3}})
+      |> EctoMorph.validate_nested_changeset([:nested], fn changeset ->
+        Ecto.Changeset.validate_number(changeset, :foo, greater_than: 5)
+      end)
 
-  changeset = EctoMorph.generate_changeset(%{nested: %{double_nested: %{field: 6}}})
-  EctoMorph.validate_nested_changeset(changeset, [:nested, :double_nested], &MySchema.validate/1)
-  ```
+      changeset = EctoMorph.generate_changeset(%{nested: %{double_nested: %{field: 6}}})
+      EctoMorph.validate_nested_changeset(changeset, [:nested, :double_nested], &MySchema.validate/1)
+
   """
   # Now the natural question is can we extend this to allow the Repo.preload syntax ? I.e. a tree?
   # [:this, plus: :this, and: [:also, these: :too]] ? I think the zipper Idea helps that along a lot.
@@ -694,14 +689,15 @@ defmodule EctoMorph do
 
   ### Examples
 
-    EctoMorph.generate_changeset(%{my: :data, relation: %{}}, MyModule)
-    |> EctoMorph.validate_required([:relation])
+      EctoMorph.generate_changeset(%{my: :data, relation: %{}}, MyModule)
+      |> EctoMorph.validate_required([:relation])
 
-    EctoMorph.generate_changeset(%{my: :data, relation: %{nested_thing: %{}}}, MyModule)
-    |> EctoMorph.validate_required([relation: :nested_thing])
+      EctoMorph.generate_changeset(%{my: :data, relation: %{nested_thing: %{}}}, MyModule)
+      |> EctoMorph.validate_required([relation: :nested_thing])
 
-    data = %{my: :data, relation: %{nested_thing: %{thing: 1}}}
-    EctoMorph.validate_required(data, [relation: [nested_thing: :thing]])
+      data = %{my: :data, relation: %{nested_thing: %{thing: 1}}}
+      EctoMorph.validate_required(data, [relation: [nested_thing: :thing]])
+
   """
   def validate_required(changeset, path) do
     schema = changeset.data.__struct__
@@ -726,7 +722,7 @@ defmodule EctoMorph do
           # This case we know the change does not have the field we are trying to ensure
           # exists in the changes (or data ?)
           # We need to also know which field we are trying to get. This is basically trash
-          # as it means we cant make map public because it has a very weird API...
+          # as it means we can't make map public because it has a very weird API...
           {field, ch} ->
             errors = [{field, {"can't be blank", [validation: :required]}} | ch.errors]
             %{ch | errors: errors, valid?: false}

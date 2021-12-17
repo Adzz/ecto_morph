@@ -1,5 +1,11 @@
 # EctoMorph
 
+[![Module Version](https://img.shields.io/hexpm/v/ecto_morph.svg)](https://hex.pm/packages/ecto_morph)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/ecto_morph/)
+[![Total Download](https://img.shields.io/hexpm/dt/ecto_morph.svg)](https://hex.pm/packages/ecto_morph)
+[![License](https://img.shields.io/hexpm/l/ecto_morph.svg)](https://github.com/Adzz/ecto_morph/blob/master/LICENSE.md)
+[![Last Updated](https://img.shields.io/github/last-commit/Adzz/ecto_morph.svg)](https://github.com/Adzz/ecto_morph/commits/master)
+
 EctoMorph morphs your Ecto capabilities into the s t r a t o s p h e r e !
 
 Parse incoming data into custom structs, then validate it.
@@ -164,7 +170,6 @@ EctoMorph.filter_by_schema_fields(%{random: "data", more: "fields"}, Test)
 You can even deep filter:
 
 ```elixir
-
 defmodule OtherThing do
   use Ecto.Schema
   @primary_key false
@@ -211,8 +216,7 @@ Check out the [docs](https://hexdocs.pm/ecto_morph) for more examples and specif
 
 ## Installation
 
-[available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `ecto_morph` to your list of dependencies in `mix.exs`:
+The package can be installed by adding `:ecto_morph` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
@@ -225,3 +229,17 @@ end
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at [https://hexdocs.pm/ecto_morph](https://hexdocs.pm/ecto_morph).
+
+## Copyright and License
+
+Copyright (c) 2019 Adam Lancaster
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at [https://www.apache.org/licenses/LICENSE-2.0](https://www.apache.org/licenses/LICENSE-2.0)
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.

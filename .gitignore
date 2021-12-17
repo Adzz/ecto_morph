@@ -22,3 +22,5 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 ecto_morph-*.tar
 
+# Temporary files, for example, from tests.
+/tmp/
