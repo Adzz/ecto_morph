@@ -1,4 +1,4 @@
-# Changelog for version 0.X
+# Changelog for version 0.1
 
 ## 0.1.25
 

@@ -214,6 +214,16 @@ EctoMorph.deep_filter_by_schema_fields(data, Test)
 
 Check out the [docs](https://hexdocs.pm/ecto_morph) for more examples and specifics
 
+
+### Contributing
+
+**NB** Set the `MIX_ENV` to `:docs` when publishing the package. This will ensure that modules inside `test/support` wont get their documentation published with the library (as they are included in the :dev env).
+
+```sh
+MIX_ENV=docs mix hex.publish
+```
+
+
 ## Installation
 
 The package can be installed by adding `:ecto_morph` to your list of dependencies in `mix.exs`:
