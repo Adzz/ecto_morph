@@ -1,18 +1,21 @@
 defmodule EctoMorph.MixProject do
   use Mix.Project
 
+  @source_url "https://github.com/Adzz/ecto_morph"
+  @version "0.1.25"
+
   def project do
     [
       name: "EctoMorph",
       app: :ecto_morph,
-      description: description(),
-      version: "0.1.25",
+      version: @version,
       package: package(),
       elixirc_paths: elixirc_paths(Mix.env()),
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
-      source_url: "https://github.com/Adzz/ecto_morph",
-      deps: deps()
+      deps: deps(),
+      docs: docs(),
+      preferred_cli_env: [docs: :docs, "hex.publish": :docs]
     ]
   end
 
@@ -25,16 +28,29 @@ defmodule EctoMorph.MixProject do
   defp deps do
     [
       {:ecto, ">= 3.0.3"},
-      {:ex_doc, "~> 0.19", only: :docs, runtime: false}
+      {:ex_doc, ">= 0.0.0", only: :docs, runtime: false}
     ]
   end
 
-  defp description(), do: "A utility library for Ecto"
-
   defp package() do
     [
-      licenses: ["Apache 2.0"],
-      links: %{"GitHub" => "https://github.com/Adzz/ecto_morph"}
+      description: "A utility library for Ecto",
+      maintainers: ["Adam Lancaster"],
+      licenses: ["Apache-2.0"],
+      links: %{"GitHub" => @source_url}
+    ]
+  end
+
+  defp docs do
+    [
+      extras: [
+        "LICENSE": [title: "License"],
+        "README.md": [title: "Overview"]
+      ],
+      main: "readme",
+      source_url: @source_url,
+      source_ref: "master",
+      formatters: ["html"]
     ]
   end
 end

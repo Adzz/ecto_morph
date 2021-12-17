@@ -1,5 +1,5 @@
 defmodule FilterBySchemaFieldsTest do
-  use ExUnit.Case, aysnc: false
+  use ExUnit.Case, async: false
 
   describe "filter_by_schema_fields/2" do
     test "returns all the fields in data that are schema fields" do
