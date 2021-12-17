@@ -155,6 +155,8 @@ defmodule EctoMorph.DeepFilterBySchemaFieldsTest do
                    double_nested_schema: %{value: "works!"},
                    meat_type: "beef",
                    pickles: 2,
+                   has_many_id: nil,
+                   has_one_id: nil,
                    sauce_ratio: Decimal.new("0.5")
                  }
                ],
@@ -309,21 +311,26 @@ defmodule EctoMorph.DeepFilterBySchemaFieldsTest do
                percentage: nil,
                steamed_ham: nil,
                has_many: nil,
+               steamed_hams: [
+                 %{
+                   double_nested_schema: %{value: "works!"},
+                   id: nil,
+                   meat_type: "beef",
+                   pickles: 2,
+                   sauce_ratio: Decimal.new("0.5"),
+                   has_many_id: nil,
+                   has_one_id: nil
+                 }
+               ],
                throughs: %{
                  geese_to_feed: nil,
                  id: nil,
                  steamed_hams: nil,
-                 through: %{id: nil, rad_level: nil}
+                 through: %{has_many_id: nil, id: nil, rad_level: nil},
+                 overlap_and_some_id: nil,
+                 schema_under_test_id: nil,
+                 table_backed_schema_id: nil
                },
-               steamed_hams: [
-                 %{
-                   id: nil,
-                   double_nested_schema: %{value: "works!"},
-                   meat_type: "beef",
-                   pickles: 2,
-                   sauce_ratio: Decimal.new("0.5")
-                 }
-               ],
                time: nil,
                utc_datetime: nil,
                utc_datetime_usec: nil
