@@ -1,5 +1,10 @@
 # Changelog for version 0.1
 
+## 0.1.26
+
+Updates to work with latest version of Ecto.
+
+
 ## 0.1.25
 
 ### Bug Fix
