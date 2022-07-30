@@ -81,7 +81,7 @@ defmodule EctoMorph.ValidateNestedChangesetTest do
     assert result.changes.aurora_borealis.errors == [
              {:probability,
               {"must be greater than %{number}",
-               [validation: :number, kind: :greater_than, number: 5]}}
+               [validation: :number, kind: :greater_than, number: Decimal.new(5)]}}
            ]
   end
 
@@ -274,7 +274,7 @@ defmodule EctoMorph.ValidateNestedChangesetTest do
     assert ch.changes.aurora_borealis.errors == [
              {:probability,
               {"must be greater than %{number}",
-               [validation: :number, kind: :greater_than, number: 5]}}
+               [validation: :number, kind: :greater_than, number: Decimal.new(5)]}}
            ]
   end
 
