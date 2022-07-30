@@ -2,7 +2,7 @@ defmodule EctoMorph.MixProject do
   use Mix.Project
 
   @source_url "https://github.com/Adzz/ecto_morph"
-  @version "0.1.25"
+  @version "0.1.26"
 
   def project do
     [

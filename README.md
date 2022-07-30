@@ -231,7 +231,7 @@ The package can be installed by adding `:ecto_morph` to your list of dependencie
 ```elixir
 def deps do
   [
-    {:ecto_morph, "~> 0.1.25"}
+    {:ecto_morph, "~> 0.1.26"}
   ]
 end
 ```
