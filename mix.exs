@@ -2,7 +2,7 @@ defmodule EctoMorph.MixProject do
   use Mix.Project
 
   @source_url "https://github.com/Adzz/ecto_morph"
-  @version "0.1.26"
+  @version "0.1.27"
 
   def project do
     [
@@ -44,7 +44,7 @@ defmodule EctoMorph.MixProject do
   defp docs do
     [
       extras: [
-        "LICENSE": [title: "License"],
+        LICENSE: [title: "License"],
         "README.md": [title: "Overview"]
       ],
       main: "readme",
