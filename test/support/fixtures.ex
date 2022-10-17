@@ -120,6 +120,17 @@ defmodule HasMany do
   end
 end
 
+defmodule NestedHasMany do
+  use Ecto.Schema
+
+  schema "nested_has_many" do
+    field(:table_backed_schema_id, :string)
+    field(:schema_under_test_id, :string)
+
+    has_one(:has_many, HasMany)
+  end
+end
+
 defmodule HasOne do
   use Ecto.Schema
 
