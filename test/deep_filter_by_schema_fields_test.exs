@@ -219,6 +219,24 @@ defmodule EctoMorph.DeepFilterBySchemaFieldsTest do
              } = result
     end
 
+    test "filtering nested not loaded" do
+      data = %NestedHasMany{
+        schema_under_test_id: "testid_123",
+        has_many: %HasMany{geese_to_feed: 5, through: %Through{}}
+      }
+
+      result =
+        EctoMorph.deep_filter_by_schema_fields(data, NestedHasMany, filter_not_loaded: true)
+
+      assert %{
+               schema_under_test_id: "testid_123",
+               has_many: %{
+                 geese_to_feed: 5,
+                 steamed_hams: nil
+               }
+             } = result
+    end
+
     test "when relations aren't loaded" do
       data = %OverlapAndSome{
         binary_id: 1,

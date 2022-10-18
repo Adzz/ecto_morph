@@ -390,9 +390,9 @@ defmodule EctoMorph do
 
           if is_list(value) do
             # Has / embeds many
-            {key, Enum.map(value, &deep_filter_by_schema_fields(&1, relation_schema))}
+            {key, Enum.map(value, &deep_filter_by_schema_fields(&1, relation_schema, opts))}
           else
-            {key, deep_filter_by_schema_fields(value, relation_schema)}
+            {key, deep_filter_by_schema_fields(value, relation_schema, opts)}
           end
         else
           # Do we handle non ecto structs as the data being filtered...
@@ -401,10 +401,10 @@ defmodule EctoMorph do
               # This essentially tries to work for through relations if it's a struct by
               # getting the struct schema out of the struct.
               %{__struct__: relation_schema} = value ->
-                {key, deep_filter_by_schema_fields(value, relation_schema)}
+                {key, deep_filter_by_schema_fields(value, relation_schema, opts)}
 
               value when is_list(value) ->
-                {key, Enum.map(value, &deep_filter_by_schema_fields(&1, schema))}
+                {key, Enum.map(value, &deep_filter_by_schema_fields(&1, schema, opts))}
 
               value ->
                 {key, value}
