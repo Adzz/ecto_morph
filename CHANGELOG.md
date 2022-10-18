@@ -1,5 +1,11 @@
 # Changelog for version 0.1
 
+## 0.1.28
+
+Fixes bug in deep_filter_by_schema_fields where options where not being passed through correctly.
+
+Thank you @SamHutchings.
+
 ## 0.1.27
 
 Updates to work with latest version of Ecto.
