@@ -222,7 +222,7 @@ defmodule EctoMorph.DeepFilterBySchemaFieldsTest do
     test "filtering nested not loaded" do
       data = %NestedHasMany{
         schema_under_test_id: "testid_123",
-        has_many: %HasMany{geese_to_feed: 5, through: %Through{}}
+        has_many: %HasMany{ geese_to_feed: 5, through: %Through{}}
       }
 
       result =
@@ -347,7 +347,9 @@ defmodule EctoMorph.DeepFilterBySchemaFieldsTest do
                  through: %{has_many_id: nil, id: nil, rad_level: nil},
                  overlap_and_some_id: nil,
                  schema_under_test_id: nil,
-                 table_backed_schema_id: nil
+                 table_backed_schema_id: nil,
+               nested_has_many_id: nil,
+
                },
                time: nil,
                utc_datetime: nil,

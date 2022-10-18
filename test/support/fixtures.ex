@@ -115,6 +115,7 @@ defmodule HasMany do
     field(:table_backed_schema_id, :string)
     field(:schema_under_test_id, :string)
     field(:overlap_and_some_id, :string)
+    field(:nested_has_many_id, :string)
     has_one(:through, Through)
     has_many(:steamed_hams, SteamedHams)
   end
