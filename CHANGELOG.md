@@ -1,6 +1,13 @@
 # Changelog for version 0.1
 
+## 0.1.29
+
+Updates deps.
+
+Fixes dialyzer specs for `cast_to_struct` Thank you @ninabelikova.
+
 ## 0.1.28
+
 
 Fixes bug in deep_filter_by_schema_fields where options where not being passed through correctly.
 
