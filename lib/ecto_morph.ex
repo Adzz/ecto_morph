@@ -60,8 +60,8 @@ defmodule EctoMorph do
       ...> test.pageviews
       10
   """
-  @spec cast_to_struct(map | ecto_struct, schema_module) :: okay_struct | error_changeset
-  @spec cast_to_struct(map | ecto_struct, schema_module, list) :: okay_struct | error_changeset
+  @spec cast_to_struct(map | ecto_struct, schema_module | struct) :: okay_struct | error_changeset
+  @spec cast_to_struct(map | ecto_struct, schema_module | struct, list) :: okay_struct | error_changeset
   def cast_to_struct(data = %{__struct__: _}, schema) do
     Map.from_struct(data) |> cast_to_struct(schema)
   end
@@ -95,8 +95,8 @@ defmodule EctoMorph do
     |> into_struct
   end
 
-  @spec cast_to_struct!(map | ecto_struct, schema_module) :: okay_struct | error_changeset
-  @spec cast_to_struct!(map | ecto_struct, schema_module, list) :: okay_struct | error_changeset
+  @spec cast_to_struct!(map | ecto_struct, schema_module) :: struct | no_return
+  @spec cast_to_struct!(map | ecto_struct, schema_module, list) :: struct | no_return
 
   @doc """
   Same as `cast_to_struct/2`, but raises if the data fails casting.
